@@ -10,7 +10,7 @@ The application stores all durable data in `grocery-buddy.db` through `expo-sqli
 - Launches and upgrades never drop tables or recreate the database. Later changes must preserve existing rows or explicitly transform them in a new migration.
 - Static migration DDL uses the unbound execution API. Repositories and version writes use prepared, parameterized statements.
 
-Current schema version: **4** (`add_explicit_session_budget_state`).
+Current schema version: **6** (`add_shopping_item_name_snapshots`).
 
 ## Tables
 
@@ -21,9 +21,9 @@ Current schema version: **4** (`add_explicit_session_budget_state`).
 | `store_products` | Current store-specific product price | Unique store/product pair; non-negative integer cents |
 | `price_history` | Append-only price observations | Non-negative integer cents with recorded timestamp |
 | `shopping_sessions` | Store shopping trips | Status is active/completed/cancelled; money uses integer cents; `budget_set` distinguishes no budget from an explicit zero budget |
-| `shopping_items` | Products in a shopping session | Positive integer quantity; unique session/product pair |
+| `shopping_items` | Products in a shopping session | Positive integer quantity; price and product-name snapshots; unique session/product pair |
 | `shopping_lists` | Reusable named lists | Non-empty name and timestamps |
-| `shopping_list_items` | Products in a reusable list | Positive integer quantity; unique list/product pair |
+| `shopping_list_items` | Products in a reusable list | Positive integer quantity; picked-up state; unique list/product pair |
 | `app_settings` | Local key/value settings | Unique non-empty text key and text value |
 | `schema_version` | Applied migrations | One row per migration version and name |
 

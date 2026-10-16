@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 import type { CreateProductInput, Product } from "@/domain/entities/product";
@@ -13,6 +13,7 @@ import {
 } from "@/features/pricing/components/price-form";
 import type { StoreProductPrice } from "@/domain/entities/store-product-price";
 import { formatPhpCents } from "@/utils/format-money";
+import { useAppDialog } from "@/hooks/use-app-dialog";
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,6 +27,7 @@ export default function ProductDetailScreen() {
   const [price, setPrice] = useState<StoreProductPrice | null>(null);
   const [priceEditing, setPriceEditing] = useState(false);
   const [priceSaving, setPriceSaving] = useState(false);
+  const { showDialog, dialogElement } = useAppDialog();
   useEffect(() => {
     const productId = Number(id);
     if (!Number.isSafeInteger(productId)) return;
@@ -156,19 +158,7 @@ export default function ProductDetailScreen() {
             <Pressable
               className="rounded-xl border border-red-200 px-4 py-3"
               onPress={() =>
-                Alert.alert(
-                  "Archive product?",
-                  "Saved prices and history will remain available.",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Archive",
-                      style: "destructive",
-                      onPress: () =>
-                        void service.archive(product.id).then(setProduct),
-                    },
-                  ],
-                )
+                showDialog({ title: "Archive product?", message: "Saved prices and history will remain available.", confirmLabel: "Archive", cancelLabel: "Cancel", destructive: true, onConfirm: () => void service.archive(product.id).then(setProduct) })
               }
             >
               <Text className="font-semibold text-red-700 dark:text-red-300">Archive</Text>
@@ -210,6 +200,7 @@ export default function ProductDetailScreen() {
           />
         </SafeAreaView>
       </Modal>
+    {dialogElement}
     </SafeAreaView>
   );
 }

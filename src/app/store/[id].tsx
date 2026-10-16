@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, useLocalSearchParams } from "expo-router";
 
 import type { StoreSummary } from "@/domain/entities/store";
 import { useSelectedStore } from "@/features/stores/hooks/use-selected-store";
 import { useStoreService } from "@/features/stores/hooks/use-store-service";
+import { useAppDialog } from "@/hooks/use-app-dialog";
 
 export default function StoreDashboardScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -14,6 +15,7 @@ export default function StoreDashboardScreen() {
   const { selectedStore, selectStore, clearSelectedStore } = useSelectedStore();
   const [store, setStore] = useState<StoreSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { showDialog, dialogElement } = useAppDialog();
 
   useEffect(() => {
     if (!Number.isSafeInteger(storeId) || storeId <= 0) {
@@ -44,32 +46,7 @@ export default function StoreDashboardScreen() {
     if (!store) {
       return;
     }
-    Alert.alert(
-      `Delete ${store.name}?`,
-      "Stores with saved prices or shopping history cannot be deleted.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
-            void service
-              .delete(store.id)
-              .then(() => {
-                clearSelectedStore();
-                router.replace("/(tabs)/stores");
-              })
-              .catch((cause: unknown) =>
-                setError(
-                  cause instanceof Error
-                    ? cause.message
-                    : "Unable to delete this store.",
-                ),
-              );
-          },
-        },
-      ],
-    );
+    showDialog({ title: `Delete ${store.name}?`, message: "Stores with saved prices or shopping history cannot be deleted.", confirmLabel: "Delete", cancelLabel: "Cancel", destructive: true, onConfirm: () => { void service.delete(store.id).then(() => { clearSelectedStore(); router.replace("/(tabs)/stores"); }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to delete this store.")); } });
   };
 
   if (!store) {
@@ -141,6 +118,7 @@ export default function StoreDashboardScreen() {
           </Text>
         </Pressable>
       </View>
+    {dialogElement}
     </SafeAreaView>
   );
 }

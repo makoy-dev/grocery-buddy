@@ -20,9 +20,10 @@ export class SQLiteCartRepository implements CartRepository {
         session = { id: created.lastInsertRowId };
       }
       await transaction.run(
-        `INSERT INTO shopping_items (session_id, product_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)
+        `INSERT INTO shopping_items (session_id, product_id, quantity, unit_price_cents, product_name_snapshot)
+         SELECT ?, ?, ?, ?, name FROM products WHERE id = ?
          ON CONFLICT(session_id, product_id) DO UPDATE SET quantity = shopping_items.quantity + excluded.quantity`,
-        [session.id, input.productId, quantity, input.unitPriceCents],
+        [session.id, input.productId, quantity, input.unitPriceCents, input.productId],
       );
       await transaction.run(
         `UPDATE shopping_sessions SET estimated_total_cents = (SELECT COALESCE(SUM(quantity * unit_price_cents), 0) FROM shopping_items WHERE session_id = ?) WHERE id = ?`,
@@ -34,7 +35,7 @@ export class SQLiteCartRepository implements CartRepository {
   async listActive(storeId: number): Promise<CartItem[]> {
     const rows = await this.database.all<CartItemRow>(
       `SELECT shopping_items.id, shopping_items.session_id, shopping_items.product_id,
-              products.name AS product_name, products.barcode,
+              COALESCE(shopping_items.product_name_snapshot, products.name) AS product_name, products.barcode,
               shopping_items.quantity, shopping_items.unit_price_cents,
               shopping_items.quantity * shopping_items.unit_price_cents AS line_subtotal_cents
        FROM shopping_items JOIN shopping_sessions ON shopping_sessions.id = shopping_items.session_id

@@ -6,7 +6,6 @@ import {
 import { Link } from "expo-router";
 import { useRef, useState } from "react";
 import {
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -34,6 +33,7 @@ import {
 import { useCartRepository } from "@/features/cart/hooks/use-cart-repository";
 import { useSelectedStore } from "@/features/stores/hooks/use-selected-store";
 import { formatPhpCents } from "@/utils/format-money";
+import { useAppDialog } from "@/hooks/use-app-dialog";
 
 export default function ScanScreen() {
   const { selectedStore, isLoading } = useSelectedStore();
@@ -52,6 +52,7 @@ export default function ScanScreen() {
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { showDialog, dialogElement } = useAppDialog();
   const lastScan = useRef<{ barcode: string | null; at: number }>({
     barcode: null,
     at: 0,
@@ -125,10 +126,7 @@ export default function ScanScreen() {
   const addToCart = async (product: Product, price: StoreProductPrice) => {
     try {
       await cart.addItem(selectedStore.id, product.id, price.currentPriceCents, cartQuantity);
-      Alert.alert(
-        "Added to cart",
-        `${cartQuantity} × ${product.name} was added at ${formatPhpCents(price.currentPriceCents)} each.`,
-      );
+      showDialog({ title: "Added to cart", message: `${cartQuantity} × ${product.name} was added at ${formatPhpCents(price.currentPriceCents)} each.` });
       resume();
     } catch (cause: unknown) {
       setError(
@@ -422,6 +420,7 @@ export default function ScanScreen() {
           />
         </SafeAreaView>
       </Modal>
+    {dialogElement}
     </SafeAreaView>
   );
 }

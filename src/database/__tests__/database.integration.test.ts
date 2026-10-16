@@ -81,7 +81,7 @@ describe('SQLite database infrastructure', () => {
     await runMigrations(database, clock);
 
     const versionRows = await database.all<{ version: number }>('SELECT version FROM schema_version ORDER BY version');
-    expect(versionRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
+    expect(versionRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }, { version: 5 }, { version: 6 }]);
     await expect(stores.findById(store.id)).resolves.toEqual(store);
   });
 
@@ -112,7 +112,7 @@ describe('SQLite database infrastructure', () => {
     ).resolves.toMatchObject({ changes: 1 });
     await expect(database.first<{ version: number }>(
       'SELECT MAX(version) AS version FROM schema_version',
-    )).resolves.toEqual({ version: 4 });
+    )).resolves.toEqual({ version: 6 });
   });
 
   it('enforces foreign-key relationships', async () => {

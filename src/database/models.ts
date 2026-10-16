@@ -58,6 +58,7 @@ export type ShoppingItemRow = {
   product_id: number;
   quantity: number;
   unit_price_cents: number;
+  product_name_snapshot: string | null;
 };
 
 export type ShoppingListRow = {
@@ -72,6 +73,7 @@ export type ShoppingListItemRow = {
   list_id: number;
   product_id: number;
   quantity: number;
+  picked_up: 0 | 1;
 };
 
 export type AppSettingRow = {

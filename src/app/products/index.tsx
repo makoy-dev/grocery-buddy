@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -9,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { Link, router } from "expo-router";
 import type {
   CreateProductInput,
   ProductSummary,
@@ -17,6 +16,7 @@ import type {
 import { ProductForm } from "@/features/products/components/product-form";
 import { useProductService } from "@/features/products/hooks/use-product-service";
 import { useSelectedStore } from "@/features/stores/hooks/use-selected-store";
+import { useAppDialog } from "@/hooks/use-app-dialog";
 
 export default function ProductsScreen() {
   const service = useProductService();
@@ -28,6 +28,7 @@ export default function ProductsScreen() {
   const [isFormVisible, setFormVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const { showDialog, dialogElement } = useAppDialog();
 
   const reload = async () =>
     setProducts(
@@ -72,31 +73,12 @@ export default function ProductsScreen() {
       setSaving(false);
     }
   };
-  const archive = (product: ProductSummary) =>
-    Alert.alert(
-      `Archive ${product.name}?`,
-      "Archived products stay in the catalog and keep all saved prices and history.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Archive",
-          style: "destructive",
-          onPress: () =>
-            void service
-              .archive(product.id)
-              .then(reload)
-              .catch((e: unknown) =>
-                setError(
-                  e instanceof Error ? e.message : "Unable to archive product.",
-                ),
-              ),
-        },
-      ],
-    );
+  const archive = (product: ProductSummary) => showDialog({ title: `Archive ${product.name}?`, message: "Archived products stay in the catalog and keep all saved prices and history.", confirmLabel: "Archive", cancelLabel: "Cancel", destructive: true, onConfirm: () => void service.archive(product.id).then(reload).catch((e: unknown) => setError(e instanceof Error ? e.message : "Unable to archive product.")) });
 
   return (
     <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark">
       <View className="flex-1 px-5 py-6">
+        <Link href="/(tabs)/more" className="mb-4 self-start"><Text className="font-semibold text-primary">← Back to More</Text></Link>
         <View className="flex-row items-center justify-between">
           <View>
             <Text className="text-3xl font-bold text-ink dark:text-ink-dark">
@@ -230,6 +212,7 @@ export default function ProductsScreen() {
           />
         </SafeAreaView>
       </Modal>
+    {dialogElement}
     </SafeAreaView>
   );
 }

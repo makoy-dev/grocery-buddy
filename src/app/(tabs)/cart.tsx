@@ -1,7 +1,6 @@
 import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
-  Alert,
   Pressable,
   ScrollView,
   Text,
@@ -18,6 +17,7 @@ import { usePricingService } from "@/features/pricing/hooks/use-pricing-service"
 import { parsePhpToCents } from "@/features/pricing/services/pricing-service";
 import { formatPhpCents } from "@/utils/format-money";
 import { BudgetPanel } from "@/features/budget/components/budget-panel";
+import { useAppDialog } from "@/hooks/use-app-dialog";
 
 export default function CartScreen() {
   const { selectedStore, isLoading } = useSelectedStore();
@@ -32,6 +32,7 @@ export default function CartScreen() {
   const [editPrice, setEditPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { showDialog, dialogElement } = useAppDialog();
   const load = useCallback(async () => {
     if (!selectedStore) return;
     try {
@@ -108,29 +109,7 @@ export default function CartScreen() {
       );
     }
   };
-  const remove = (item: CartItem) =>
-    Alert.alert(
-      `Remove ${item.productName}?`,
-      "This removes the item from the active cart.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () =>
-            void cart
-              .remove(selectedStore.id, item.productId)
-              .then(refreshItems)
-              .catch((cause: unknown) =>
-                setError(
-                  cause instanceof Error
-                    ? cause.message
-                    : "Unable to remove item.",
-                ),
-              ),
-        },
-      ],
-    );
+  const remove = (item: CartItem) => showDialog({ title: `Remove ${item.productName}?`, message: "This removes the item from the active cart.", confirmLabel: "Remove", cancelLabel: "Cancel", destructive: true, onConfirm: () => void cart.remove(selectedStore.id, item.productId).then(refreshItems).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to remove item.")) });
   const saveCartPrice = async () => {
     if (!editing) return;
     try {
@@ -176,88 +155,9 @@ export default function CartScreen() {
       );
     }
   };
-  const clear = () =>
-    Alert.alert(
-      "Clear cart?",
-      "All items will be removed from this active session.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: () =>
-            void cart
-              .clear(selectedStore.id)
-              .then(refreshItems)
-              .catch((cause: unknown) =>
-                setError(
-                  cause instanceof Error
-                    ? cause.message
-                    : "Unable to clear cart.",
-                ),
-              ),
-        },
-      ],
-    );
-  const complete = () =>
-    Alert.alert(
-      "Complete shopping session?",
-      "The estimated total will be preserved.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Complete",
-          onPress: () =>
-            void (async () => {
-              setBusy(true);
-              try {
-                await sessions.complete(
-                  session!.id,
-                  actual.trim() ? actual : null,
-                );
-                setActual("");
-                await load();
-              } catch (cause: unknown) {
-                setError(
-                  cause instanceof Error
-                    ? cause.message
-                    : "Unable to complete session.",
-                );
-              } finally {
-                setBusy(false);
-              }
-            })(),
-        },
-      ],
-    );
-  const discard = () =>
-    Alert.alert(
-      "Discard shopping session?",
-      "The session and its items remain in history as cancelled.",
-      [
-        { text: "Keep", style: "cancel" },
-        {
-          text: "Discard",
-          style: "destructive",
-          onPress: () =>
-            void (async () => {
-              setBusy(true);
-              try {
-                await sessions.discard(session!.id);
-                await load();
-              } catch (cause: unknown) {
-                setError(
-                  cause instanceof Error
-                    ? cause.message
-                    : "Unable to discard session.",
-                );
-              } finally {
-                setBusy(false);
-              }
-            })(),
-        },
-      ],
-    );
+  const clear = () => showDialog({ title: "Clear cart?", message: "All items will be removed from this active session.", confirmLabel: "Clear", cancelLabel: "Cancel", destructive: true, onConfirm: () => void cart.clear(selectedStore.id).then(refreshItems).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to clear cart.")) });
+  const complete = () => showDialog({ title: "Complete shopping session?", message: "The estimated total will be preserved.", confirmLabel: "Complete", cancelLabel: "Cancel", onConfirm: () => void (async () => { setBusy(true); try { await sessions.complete(session!.id, actual.trim() ? actual : null); setActual(""); await load(); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : "Unable to complete session."); } finally { setBusy(false); } })() });
+  const discard = () => showDialog({ title: "Discard shopping session?", message: "The session and its items remain in history as cancelled.", confirmLabel: "Discard", cancelLabel: "Keep", destructive: true, onConfirm: () => void (async () => { setBusy(true); try { await sessions.discard(session!.id); await load(); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : "Unable to discard session."); } finally { setBusy(false); } })() });
   return (
     <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark">
       <ScrollView
@@ -462,6 +362,7 @@ export default function CartScreen() {
           </View>
         )}
       </View>
+      {dialogElement}
     </SafeAreaView>
   );
 }

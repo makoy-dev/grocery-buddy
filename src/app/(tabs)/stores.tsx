@@ -1,20 +1,32 @@
-import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, Pressable, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { useEffect, useState } from "react";
+import {
+  FlatList,
+  Modal,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
-import type { StoreSummary } from '@/domain/entities/store';
-import { EmptyState } from '@/features/stores/components/empty-state';
-import { StoreCard } from '@/features/stores/components/store-card';
-import { StoreForm, type StoreFormValues } from '@/features/stores/components/store-form';
-import { useSelectedStore } from '@/features/stores/hooks/use-selected-store';
-import { useStoreService } from '@/features/stores/hooks/use-store-service';
+import type { StoreSummary } from "@/domain/entities/store";
+import { EmptyState } from "@/features/stores/components/empty-state";
+import { StoreCard } from "@/features/stores/components/store-card";
+import {
+  StoreForm,
+  type StoreFormValues,
+} from "@/features/stores/components/store-form";
+import { useSelectedStore } from "@/features/stores/hooks/use-selected-store";
+import { useStoreService } from "@/features/stores/hooks/use-store-service";
+import { useAppDialog } from "@/hooks/use-app-dialog";
 
 export default function StoresScreen() {
   const service = useStoreService();
   const { selectedStore, selectStore, clearSelectedStore } = useSelectedStore();
+  const { showDialog, dialogElement } = useAppDialog();
   const [stores, setStores] = useState<StoreSummary[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFormVisible, setIsFormVisible] = useState(false);
@@ -26,7 +38,8 @@ export default function StoresScreen() {
     // The list starts a new asynchronous load whenever the search term changes.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
-    void service.list(search)
+    void service
+      .list(search)
       .then((nextStores) => {
         if (isMounted) {
           setStores(nextStores);
@@ -35,7 +48,9 @@ export default function StoresScreen() {
       })
       .catch((cause: unknown) => {
         if (isMounted) {
-          setError(cause instanceof Error ? cause.message : 'Unable to load stores.');
+          setError(
+            cause instanceof Error ? cause.message : "Unable to load stores.",
+          );
         }
       })
       .finally(() => {
@@ -76,7 +91,9 @@ export default function StoresScreen() {
       setIsFormVisible(false);
       await reload();
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'Unable to save this store.');
+      setError(
+        cause instanceof Error ? cause.message : "Unable to save this store.",
+      );
     } finally {
       setIsSaving(false);
     }
@@ -87,41 +104,30 @@ export default function StoresScreen() {
       await service.setFavorite(store.id, !store.isFavorite);
       await reload();
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'Unable to update this favorite.');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Unable to update this favorite.",
+      );
     }
   };
 
   const openStore = async (store: StoreSummary) => {
     try {
       await selectStore(store.id);
-      router.push({ pathname: '/store/[id]', params: { id: String(store.id) } });
+      router.push({
+        pathname: "/store/[id]",
+        params: { id: String(store.id) },
+      });
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'Unable to select this store.');
+      setError(
+        cause instanceof Error ? cause.message : "Unable to select this store.",
+      );
     }
   };
 
   const confirmDelete = (store: StoreSummary) => {
-    Alert.alert(
-      `Delete ${store.name}?`,
-      'A store with saved prices or shopping history cannot be deleted. Empty stores can be removed permanently.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void service.delete(store.id)
-              .then(async () => {
-                if (selectedStore?.id === store.id) {
-                  clearSelectedStore();
-                }
-                await reload();
-              })
-              .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : 'Unable to delete this store.'));
-          },
-        },
-      ],
-    );
+    showDialog({ title: `Delete ${store.name}?`, message: "A store with saved prices or shopping history cannot be deleted. Empty stores can be removed permanently.", confirmLabel: "Delete", cancelLabel: "Cancel", destructive: true, onConfirm: () => { void service.delete(store.id).then(async () => { if (selectedStore?.id === store.id) clearSelectedStore(); await reload(); }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to delete this store.")); } });
   };
 
   return (
@@ -129,11 +135,21 @@ export default function StoresScreen() {
       <View className="flex-1 px-5 py-6">
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-3xl font-bold text-ink dark:text-ink-dark">Stores</Text>
-            <Text className="mt-1 text-sm text-muted dark:text-muted-dark">Choose where you shop.</Text>
+            <Text className="text-3xl font-bold text-ink dark:text-ink-dark">
+              Stores
+            </Text>
+            <Text className="mt-1 text-sm text-muted dark:text-muted-dark">
+              Choose where you shop.
+            </Text>
           </View>
-          <Pressable accessibilityRole="button" className="rounded-xl bg-primary px-4 py-3 dark:bg-primary-dark" onPress={openCreate}>
-            <Text className="font-semibold text-white dark:text-stone-950">Add</Text>
+          <Pressable
+            accessibilityRole="button"
+            className="rounded-xl bg-primary px-4 py-3 dark:bg-primary-dark"
+            onPress={openCreate}
+          >
+            <Text className="font-semibold text-white dark:text-stone-950">
+              Add
+            </Text>
           </Pressable>
         </View>
 
@@ -145,7 +161,11 @@ export default function StoresScreen() {
           placeholderTextColor="#78716c"
           value={search}
         />
-        {error && <Text className="mt-3 text-sm text-red-700 dark:text-red-300">{error}</Text>}
+        {error && (
+          <Text className="mt-3 text-sm text-red-700 dark:text-red-300">
+            {error}
+          </Text>
+        )}
 
         <FlatList
           className="mt-5"
@@ -155,8 +175,12 @@ export default function StoresScreen() {
           ListEmptyComponent={
             isLoading ? undefined : (
               <EmptyState
-                message={search ? 'Try another name or add a new store.' : 'Add your first grocery store to start tracking prices.'}
-                title={search ? 'No stores found' : 'No stores yet'}
+                message={
+                  search
+                    ? "Try another name or add a new store."
+                    : "Add your first grocery store to start tracking prices."
+                }
+                title={search ? "No stores found" : "No stores yet"}
               />
             )
           }
@@ -172,7 +196,11 @@ export default function StoresScreen() {
         />
       </View>
 
-      <Modal animationType="slide" onRequestClose={() => setIsFormVisible(false)} visible={isFormVisible}>
+      <Modal
+        animationType="slide"
+        onRequestClose={() => setIsFormVisible(false)}
+        visible={isFormVisible}
+      >
         <SafeAreaView className="flex-1 bg-canvas px-5 py-6 dark:bg-canvas-dark">
           <StoreForm
             initialName={editingStore?.name}
@@ -180,15 +208,24 @@ export default function StoresScreen() {
             onCancel={() => setIsFormVisible(false)}
             onSubmit={saveStore}
             serverError={error}
-            submitLabel={editingStore ? 'Save changes' : 'Create store'}
+            submitLabel={editingStore ? "Save changes" : "Create store"}
           />
           {editingStore && (
-            <Pressable className="mt-8 self-center px-4 py-3" onPress={() => { setIsFormVisible(false); confirmDelete(editingStore); }}>
-              <Text className="font-semibold text-red-700 dark:text-red-300">Delete store</Text>
+            <Pressable
+              className="mt-8 self-center px-4 py-3"
+              onPress={() => {
+                setIsFormVisible(false);
+                confirmDelete(editingStore);
+              }}
+            >
+              <Text className="font-semibold text-red-700 dark:text-red-300">
+                Delete store
+              </Text>
             </Pressable>
           )}
         </SafeAreaView>
       </Modal>
+    {dialogElement}
     </SafeAreaView>
   );
 }
