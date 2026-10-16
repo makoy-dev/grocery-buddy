@@ -10,10 +10,7 @@
     "android": {
       "package": "com.grocerygodz.grocerybuddy",
       "versionCode": 1,
-      "permissions": [
-        "CAMERA",
-        "android.permission.CAMERA"
-      ],
+      "permissions": ["CAMERA"],
       "adaptiveIcon": {
         "backgroundColor": "#E8771B",
         "foregroundImage": "./assets/images/grocery-godz-bg.png"

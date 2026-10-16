@@ -49,6 +49,7 @@ export default function ScanScreen() {
   const [scanning, setScanning] = useState(false);
   const [cameraStarted, setCameraStarted] = useState(false);
   const [torch, setTorch] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [lookupResult, setLookupResult] = useState<BarcodeLookup | null>(null);
   const [manualBarcode, setManualBarcode] = useState("");
   const [cartQuantity, setCartQuantity] = useState(1);
@@ -121,6 +122,7 @@ export default function ScanScreen() {
     setPendingProduct(null);
     setForm(null);
     setError(null);
+    setCameraError(null);
     setCartQuantity(1);
     setCameraStarted(true);
     setScanning(true);
@@ -128,6 +130,7 @@ export default function ScanScreen() {
   const startCamera = () => {
     setLookupResult(null);
     setError(null);
+    setCameraError(null);
     setCameraStarted(true);
     setScanning(true);
   };
@@ -209,6 +212,11 @@ export default function ScanScreen() {
                 onBarcodeScanned={(event: BarcodeScanningResult) =>
                   void handleLookup(event.data, event.type)
                 }
+                onMountError={(event) => {
+                  setCameraError(event.message);
+                  setScanning(false);
+                  setCameraStarted(false);
+                }}
               />
               <View className="pointer-events-none absolute inset-0 items-center justify-center">
                 <View className="h-36 w-72 rounded-2xl border-2 border-white" />
@@ -234,6 +242,15 @@ export default function ScanScreen() {
             >
               <Text className="font-semibold text-primary">Close camera</Text>
             </Pressable>
+          </View>
+        ) : cameraAvailable && permission === null ? (
+          <View className="mt-5 rounded-2xl border border-border bg-surface p-5 dark:border-border-dark dark:bg-surface-dark">
+            <Text className="text-lg font-semibold text-ink dark:text-ink-dark">
+              Checking camera permission…
+            </Text>
+            <Text className="mt-2 text-sm text-muted dark:text-muted-dark">
+              Camera access is required to scan product barcodes.
+            </Text>
           </View>
         ) : cameraAvailable && permission?.granted ? (
           <Pressable
@@ -297,6 +314,16 @@ export default function ScanScreen() {
           <Text className="mt-3 text-sm text-red-700 dark:text-red-300">
             {error}
           </Text>
+        )}
+        {cameraError && (
+          <View className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/40">
+            <Text className="text-sm text-red-800 dark:text-red-200">
+              Camera could not start: {cameraError}
+            </Text>
+            <Text className="mt-1 text-xs text-red-700 dark:text-red-300">
+              Check Grocery Godz camera access in Android Settings, then try again.
+            </Text>
+          </View>
         )}
         {lookupResult && (
           <View className="mt-5 rounded-2xl border border-primary bg-surface p-5 dark:bg-surface-dark">
