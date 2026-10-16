@@ -55,7 +55,7 @@ export class SQLitePricingRepository implements PricingRepository {
 }
 
 function assertMoneyInCents(value: number): void {
-  if (!Number.isSafeInteger(value) || value < 0) {
-    throw new Error('priceCents must be a non-negative integer.');
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error('priceCents must be a positive integer.');
   }
 }

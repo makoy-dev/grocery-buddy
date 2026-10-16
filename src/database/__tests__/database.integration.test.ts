@@ -17,6 +17,7 @@ import { SQLiteStoreRepository } from '@/database/repositories/store-repository'
 import { StoreDeletionBlockedError } from '@/domain/errors/store-errors';
 import { StoreService } from '@/features/stores/services/store-service';
 import { ProductService } from '@/features/products/services/product-service';
+import { PricingService, parsePhpToCents } from '@/features/pricing/services/pricing-service';
 
 import { NodeSQLiteConnection } from '@/database/__test-support__/node-sqlite-connection';
 
@@ -179,7 +180,7 @@ describe('SQLite database infrastructure', () => {
     expect(storedValue).toEqual({ price_cents: 1299, storage_type: 'integer' });
     await expect(
       prices.record({ storeId: store.id, productId: product.id, priceCents: 12.99 }),
-    ).rejects.toThrow('priceCents must be a non-negative integer.');
+    ).rejects.toThrow('priceCents must be a positive integer.');
   });
 
   it('allows only one active shopping session per store', async () => {
@@ -295,5 +296,40 @@ describe('SQLite database infrastructure', () => {
     await expect(database.run('DELETE FROM products WHERE id = ?', [product.id])).rejects.toThrow(/Cannot delete a product/);
     await products.archive(product.id);
     await expect(database.first<{ count: number }>('SELECT COUNT(*) AS count FROM price_history WHERE product_id = ?', [product.id])).resolves.toEqual({ count: 1 });
+  });
+
+  it('records independent price history and keeps cart snapshot prices unchanged', async () => {
+    const stores = new SQLiteStoreRepository(database, clock);
+    const products = new SQLiteProductRepository(database, clock);
+    const prices = new SQLitePricingRepository(database, clock);
+    const service = new PricingService(prices);
+    const store = await stores.create({ name: 'Snapshot Market' });
+    const product = await products.create({ barcode: '00004', name: 'Coffee' });
+    await service.save(store.id, product.id, '125.00');
+    await database.run(
+      `INSERT INTO shopping_sessions (store_id, status, budget_cents, estimated_total_cents, started_at)
+       VALUES (?, 'active', 10000, 12500, ?)`,
+      [store.id, timestamp],
+    );
+    const session = await database.first<{ id: number }>('SELECT id FROM shopping_sessions WHERE store_id = ?', [store.id]);
+    if (!session) throw new Error('Expected the shopping session to be created.');
+    await database.run(
+      'INSERT INTO shopping_items (session_id, product_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)',
+      [session.id, product.id, 1, 12500],
+    );
+
+    await service.save(store.id, product.id, 132);
+    await expect(prices.findCurrent(store.id, product.id)).resolves.toMatchObject({ currentPriceCents: 13200 });
+    await expect(database.first<{ unit_price_cents: number }>('SELECT unit_price_cents FROM shopping_items WHERE product_id = ?', [product.id])).resolves.toEqual({ unit_price_cents: 12500 });
+    await expect(database.first<{ count: number }>('SELECT COUNT(*) AS count FROM price_history WHERE store_id = ? AND product_id = ?', [store.id, product.id])).resolves.toEqual({ count: 2 });
+  });
+
+  it('rejects invalid PHP amounts before writing a price', async () => {
+    expect(parsePhpToCents('125.00')).toBe(12500);
+    expect(parsePhpToCents(132)).toBe(13200);
+    expect(() => parsePhpToCents('0')).toThrow(/positive/);
+    expect(() => parsePhpToCents('-1')).toThrow(/PHP amount/);
+    expect(() => parsePhpToCents('12.999')).toThrow(/two decimal/);
+    expect(() => parsePhpToCents(Number.NaN)).toThrow(/PHP amount/);
   });
 });
