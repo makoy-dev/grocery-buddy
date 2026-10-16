@@ -45,6 +45,13 @@ export default function MoreScreen() {
           <Text className="text-2xl text-muted dark:text-muted-dark">›</Text>
         </View>
       </Link>
+      <Link href="/comparisons" className="rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+        <View className="flex-row items-center">
+          <View className="h-12 w-12 items-center justify-center rounded-2xl bg-sky-500/10 dark:bg-sky-400/15"><SymbolView name={{ ios: 'arrow.left.arrow.right', android: 'compare_arrows' }} tintColor="#0EA5E9" size={24} /></View>
+          <View className="ml-4 flex-1"><Text className="text-base font-bold text-ink dark:text-ink-dark">Price comparison</Text><Text className="mt-1 text-sm text-muted dark:text-muted-dark">Compare saved prices across stores</Text></View>
+          <Text className="text-2xl text-muted dark:text-muted-dark">›</Text>
+        </View>
+      </Link>
       </View>
     </AppScreen>
   );
