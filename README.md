@@ -1,6 +1,6 @@
-# Grocery Buddy
+# Grocery Godz
 
-Grocery Buddy is an Android-first, iOS-compatible grocery shopping price tracker built with Expo and React Native. It is designed to keep stores, products, prices, shopping sessions, and totals entirely on the device.
+Grocery Godz is an Android-first, iOS-compatible grocery shopping price tracker built with Expo and React Native. It is designed to keep stores, products, prices, shopping sessions, and totals entirely on the device.
 
 This repository currently contains the application foundation and five-tab navigation shell. Store management, barcode scanning, price persistence, and cart calculations are not implemented yet.
 

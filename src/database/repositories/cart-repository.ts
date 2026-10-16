@@ -8,6 +8,8 @@ export class SQLiteCartRepository implements CartRepository {
   constructor(private readonly database: DatabaseConnection, private readonly clock: Clock = () => new Date().toISOString()) {}
 
   async addItem(input: AddCartItemInput): Promise<void> {
+    const quantity = input.quantity ?? 1;
+    if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error('Cart quantity must be a positive whole number.');
     await this.database.transaction(async (transaction) => {
       let session = await transaction.first<{ id: number }>("SELECT id FROM shopping_sessions WHERE store_id = ? AND status = 'active'", [input.storeId]);
       if (!session) {
@@ -18,9 +20,9 @@ export class SQLiteCartRepository implements CartRepository {
         session = { id: created.lastInsertRowId };
       }
       await transaction.run(
-        `INSERT INTO shopping_items (session_id, product_id, quantity, unit_price_cents) VALUES (?, ?, 1, ?)
-         ON CONFLICT(session_id, product_id) DO UPDATE SET quantity = shopping_items.quantity + 1`,
-        [session.id, input.productId, input.unitPriceCents],
+        `INSERT INTO shopping_items (session_id, product_id, quantity, unit_price_cents) VALUES (?, ?, ?, ?)
+         ON CONFLICT(session_id, product_id) DO UPDATE SET quantity = shopping_items.quantity + excluded.quantity`,
+        [session.id, input.productId, quantity, input.unitPriceCents],
       );
       await transaction.run(
         `UPDATE shopping_sessions SET estimated_total_cents = (SELECT COALESCE(SUM(quantity * unit_price_cents), 0) FROM shopping_items WHERE session_id = ?) WHERE id = ?`,

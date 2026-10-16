@@ -1,6 +1,6 @@
-# Grocery Buddy Engineering Guide
+# Grocery Godz Engineering Guide
 
-Grocery Buddy is an Android-first, iOS-compatible Expo application. It is a fully offline grocery price tracker: users select a store, scan a barcode, save a store-specific price, and estimate a shopping total.
+Grocery Godz is an Android-first, iOS-compatible Expo application. It is a fully offline grocery price tracker: users select a store, scan a barcode, save a store-specific price, and estimate a shopping total.
 
 ## Non-negotiable offline rules
 

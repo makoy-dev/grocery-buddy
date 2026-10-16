@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Grocery Buddy",
+    "name": "Grocery Godz",
     "slug": "grocery-buddy",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -34,12 +34,13 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Grocery Buddy to scan grocery barcodes.",
+          "cameraPermission": "Allow Grocery Godz to scan grocery barcodes.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,

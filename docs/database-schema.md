@@ -1,4 +1,4 @@
-# Grocery Buddy database schema
+# Grocery Godz database schema
 
 The application stores all durable data in `grocery-buddy.db` through `expo-sqlite`. Startup enables WAL journaling and `PRAGMA foreign_keys = ON`, then applies each unapplied migration inside an exclusive transaction.
 

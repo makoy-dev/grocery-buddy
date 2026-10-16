@@ -1,22 +1,33 @@
-import { Link } from 'expo-router';
-import { SafeAreaView, Text, View } from 'react-native';
-import { useEffect, useState } from 'react';
+import { Link, useFocusEffect } from 'expo-router';
+import { Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCallback, useState } from 'react';
 
 import { useSelectedStore } from '@/features/stores/hooks/use-selected-store';
 import { useSessionService } from '@/features/sessions/hooks/use-session-service';
 import type { ShoppingSession } from '@/domain/entities/shopping-session';
 import { formatPhpCents } from '@/utils/format-money';
+import { BrandLogo } from '@/components/ui/brand-logo';
 
 export default function HomeScreen() {
   const { selectedStore, isLoading } = useSelectedStore();
   const sessions = useSessionService();
   const [session, setSession] = useState<ShoppingSession | null>(null);
-  useEffect(() => { if (selectedStore) void sessions.getActive(selectedStore.id).then(setSession); }, [selectedStore, sessions]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!selectedStore) {
+        setSession(null);
+        return undefined;
+      }
+      void sessions.getActive(selectedStore.id).then(setSession);
+      return undefined;
+    }, [selectedStore, sessions]),
+  );
 
   return (
     <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark">
       <View className="flex-1 px-6 py-8">
-        <Text className="text-3xl font-bold text-ink dark:text-ink-dark">Grocery Buddy</Text>
+        <BrandLogo />
         <Text className="mt-3 text-base leading-6 text-muted dark:text-muted-dark">
           Your offline grocery price tracker.
         </Text>
@@ -29,7 +40,7 @@ export default function HomeScreen() {
             <Text className="mt-2 text-sm text-muted dark:text-muted-dark">
               {selectedStore.productCount} saved {selectedStore.productCount === 1 ? 'product' : 'products'}
             </Text>
-            {session && <View className="mt-5 border-t border-border pt-4"><Text className="text-sm font-semibold text-ink dark:text-ink-dark">Active trip</Text><Text className="mt-1 text-sm text-muted">Estimated total: {formatPhpCents(session.estimatedTotalCents)}</Text><Text className="mt-1 text-sm text-muted">{session.budgetCents === null ? 'No budget set' : `Budget: ${formatPhpCents(session.budgetCents)}`}</Text></View>}
+            {session && <View className="mt-5 border-t border-border pt-4 dark:border-border-dark"><Text className="text-sm font-semibold text-ink dark:text-ink-dark">Active trip</Text><Text className="mt-1 text-sm text-muted dark:text-muted-dark">Estimated total: {formatPhpCents(session.estimatedTotalCents)}</Text><Text className="mt-1 text-sm text-muted dark:text-muted-dark">{session.budgetCents === null ? 'No budget set' : `Budget: ${formatPhpCents(session.budgetCents)}`}</Text></View>}
           </View>
         ) : (
           <View className="mt-8 rounded-2xl border border-dashed border-border p-6 dark:border-border-dark">
