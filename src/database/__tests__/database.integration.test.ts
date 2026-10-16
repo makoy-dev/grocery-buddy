@@ -20,6 +20,8 @@ import { ProductService } from '@/features/products/services/product-service';
 import { PricingService, parsePhpToCents } from '@/features/pricing/services/pricing-service';
 import { SQLiteSessionRepository } from '@/database/repositories/session-repository';
 import { SessionService } from '@/features/sessions/services/session-service';
+import { SQLiteCartRepository } from '@/database/repositories/cart-repository';
+import { CartService } from '@/features/cart/services/cart-service';
 
 import { NodeSQLiteConnection } from '@/database/__test-support__/node-sqlite-connection';
 
@@ -361,5 +363,30 @@ describe('SQLite database infrastructure', () => {
     await expect(service.discard(session.id)).resolves.toMatchObject({ status: 'cancelled', storeId: store.id });
     await expect(database.first<{ count: number }>('SELECT COUNT(*) AS count FROM shopping_sessions WHERE id = ?', [session.id])).resolves.toEqual({ count: 1 });
     await expect(service.start(store.id)).resolves.toMatchObject({ status: 'active', storeId: store.id });
+  });
+
+  it('maintains cart snapshots, quantities, integer totals, removal, and store isolation', async () => {
+    const stores = new SQLiteStoreRepository(database, clock);
+    const products = new SQLiteProductRepository(database, clock);
+    const firstStore = await stores.create({ name: 'Cart Market One' });
+    const secondStore = await stores.create({ name: 'Cart Market Two' });
+    const rice = await products.create({ barcode: '00005', name: 'Rice' });
+    const tea = await products.create({ barcode: '00006', name: 'Tea' });
+    const cart = new CartService(new SQLiteCartRepository(database, clock));
+
+    await cart.addItem(firstStore.id, rice.id, 12500);
+    await cart.addItem(firstStore.id, rice.id, 12500);
+    await cart.addItem(firstStore.id, tea.id, 499);
+    await expect(cart.list(firstStore.id)).resolves.toEqual(expect.arrayContaining([
+      expect.objectContaining({ productId: rice.id, quantity: 2, unitPriceCents: 12500, lineSubtotalCents: 25000 }),
+      expect.objectContaining({ productId: tea.id, quantity: 1, unitPriceCents: 499, lineSubtotalCents: 499 }),
+    ]));
+    await cart.setQuantity(firstStore.id, rice.id, 3);
+    await cart.setUnitPrice(firstStore.id, rice.id, 13000);
+    await expect(cart.list(firstStore.id)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ productId: rice.id, quantity: 3, unitPriceCents: 13000, lineSubtotalCents: 39000 })]));
+    await cart.remove(firstStore.id, tea.id);
+    await expect(cart.list(firstStore.id)).resolves.toHaveLength(1);
+    await expect(cart.list(secondStore.id)).resolves.toHaveLength(0);
+    await expect(database.first<{ estimated_total_cents: number }>('SELECT estimated_total_cents FROM shopping_sessions WHERE store_id = ? AND status = \'active\'', [firstStore.id])).resolves.toEqual({ estimated_total_cents: 39000 });
   });
 });
