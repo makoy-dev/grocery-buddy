@@ -5,7 +5,7 @@ type BrandLogoProps = { compact?: boolean };
 
 export function BrandLogo({ compact = false }: BrandLogoProps) {
   return (
-    <View className={compact ? 'h-12 w-12' : 'h-28 w-full max-w-sm self-center'}>
+    <View className={`${compact ? 'h-12 w-12 rounded-xl p-1.5' : 'h-28 w-full max-w-sm self-center rounded-3xl p-3'} overflow-hidden bg-primary dark:bg-primary-dark`}>
       <Image
         source={require('../../../assets/images/grocerygodzlogo.svg')}
         contentFit="contain"

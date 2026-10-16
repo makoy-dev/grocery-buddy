@@ -59,6 +59,9 @@ export default function MoreScreen() {
           <Text className="text-2xl text-muted dark:text-muted-dark">›</Text>
         </View>
       </Link>
+      <Link href="/settings" className="rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+        <View className="flex-row items-center"><View className="h-12 w-12 items-center justify-center rounded-2xl bg-stone-500/10 dark:bg-stone-400/15"><SymbolView name={{ ios: 'gearshape.fill', android: 'settings' }} tintColor="#78716C" size={24} /></View><View className="ml-4 flex-1"><Text className="text-base font-bold text-ink dark:text-ink-dark">Settings & backup</Text><Text className="mt-1 text-sm text-muted dark:text-muted-dark">Themes, preferences, and offline data export</Text></View><Text className="text-2xl text-muted dark:text-muted-dark">›</Text></View>
+      </Link>
       </View>
     </AppScreen>
   );

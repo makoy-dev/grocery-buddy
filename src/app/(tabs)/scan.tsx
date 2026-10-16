@@ -4,15 +4,17 @@ import {
   type BarcodeScanningResult,
 } from "expo-camera";
 import { Link } from "expo-router";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Modal,
   Platform,
   Pressable,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
+import { useSQLiteContext } from "expo-sqlite";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import type { CreateProductInput, Product } from "@/domain/entities/product";
@@ -34,6 +36,8 @@ import { useCartRepository } from "@/features/cart/hooks/use-cart-repository";
 import { useSelectedStore } from "@/features/stores/hooks/use-selected-store";
 import { formatPhpCents } from "@/utils/format-money";
 import { useAppDialog } from "@/hooks/use-app-dialog";
+import { ExpoSQLiteConnection } from "@/database/expo-sqlite-connection";
+import { SQLiteSettingsRepository } from "@/database/repositories/settings-repository";
 
 export default function ScanScreen() {
   const { selectedStore, isLoading } = useSelectedStore();
@@ -53,6 +57,8 @@ export default function ScanScreen() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const { showDialog, dialogElement } = useAppDialog();
+  const sqlite = useSQLiteContext();
+  const settings = useMemo(() => new SQLiteSettingsRepository(new ExpoSQLiteConnection(sqlite)), [sqlite]);
   const lastScan = useRef<{ barcode: string | null; at: number }>({
     barcode: null,
     at: 0,
@@ -99,6 +105,8 @@ export default function ScanScreen() {
     setError(null);
     setManualBarcode("");
     try {
+      const vibrationEnabled = await settings.get("scanner_vibration_enabled");
+      if (vibrationEnabled !== "false") Vibration.vibrate(45);
       setLookupResult(await lookup.lookup(selectedStore.id, barcode, type));
     } catch (cause: unknown) {
       setError(
