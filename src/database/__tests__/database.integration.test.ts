@@ -7,11 +7,15 @@ import { join } from 'node:path';
 
 import type { DatabaseConnection } from '@/database/connection';
 import { configureDatabase } from '@/database/configure-database';
+import { initialSchemaMigration } from '@/database/migrations/001-initial-schema';
 import { latestSchemaVersion } from '@/database/migrations';
 import { runMigrations } from '@/database/migrations/migration-runner';
 import { SQLitePricingRepository } from '@/database/repositories/pricing-repository';
 import { SQLiteProductRepository } from '@/database/repositories/product-repository';
+import { SQLiteSettingsRepository } from '@/database/repositories/settings-repository';
 import { SQLiteStoreRepository } from '@/database/repositories/store-repository';
+import { StoreDeletionBlockedError } from '@/domain/errors/store-errors';
+import { StoreService } from '@/features/stores/services/store-service';
 
 import { NodeSQLiteConnection } from '@/database/__test-support__/node-sqlite-connection';
 
@@ -70,8 +74,38 @@ describe('SQLite database infrastructure', () => {
     await runMigrations(database, clock);
 
     const versionRows = await database.all<{ version: number }>('SELECT version FROM schema_version');
-    expect(versionRows).toEqual([{ version: 1 }]);
+    expect(versionRows).toEqual([{ version: 1 }, { version: 2 }]);
     await expect(stores.findById(store.id)).resolves.toEqual(store);
+  });
+
+  it('upgrades a version-one database without dropping its rows', async () => {
+    await database.close();
+    database = new NodeSQLiteConnection(join(directory, 'legacy.db'));
+    await database.exec('PRAGMA foreign_keys = ON;');
+    await initialSchemaMigration.up(database);
+    await database.exec(`
+      CREATE TABLE schema_version (
+        version INTEGER PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL UNIQUE,
+        applied_at TEXT NOT NULL
+      ) STRICT;
+    `);
+    await database.run(
+      'INSERT INTO schema_version (version, name, applied_at) VALUES (?, ?, ?)',
+      [1, initialSchemaMigration.name, timestamp],
+    );
+    const stores = new SQLiteStoreRepository(database, clock);
+    const createdStore = await stores.create({ name: 'Upgrade Market' });
+
+    await runMigrations(database, clock);
+
+    expect(await stores.findById(createdStore.id)).toEqual(createdStore);
+    await expect(
+      database.run('DELETE FROM stores WHERE id = ?', [createdStore.id]),
+    ).resolves.toMatchObject({ changes: 1 });
+    await expect(database.first<{ version: number }>(
+      'SELECT MAX(version) AS version FROM schema_version',
+    )).resolves.toEqual({ version: 2 });
   });
 
   it('enforces foreign-key relationships', async () => {
@@ -177,5 +211,50 @@ describe('SQLite database infrastructure', () => {
 
     const reopenedStore = await new SQLiteStoreRepository(database, clock).findById(createdStore.id);
     expect(reopenedStore).toEqual(createdStore);
+  });
+
+  it('supports store search, editing, favorites, and selected-store persistence', async () => {
+    const storeRepository = new SQLiteStoreRepository(database, clock);
+    const service = new StoreService(storeRepository, new SQLiteSettingsRepository(database));
+    const created = await service.create({ name: '  Local  Grocer  ' });
+
+    await expect(service.list('local')).resolves.toHaveLength(1);
+    await service.update(created.id, { name: 'Local Grocer Updated' });
+    await service.setFavorite(created.id, true);
+    await service.select(created.id);
+
+    await expect(service.getSelected()).resolves.toMatchObject({
+      name: 'Local Grocer Updated',
+      isFavorite: true,
+      productCount: 0,
+    });
+  });
+
+  it('blocks deletion when a store has saved price data', async () => {
+    const storeRepository = new SQLiteStoreRepository(database, clock);
+    const products = new SQLiteProductRepository(database, clock);
+    const prices = new SQLitePricingRepository(database, clock);
+    const service = new StoreService(storeRepository, new SQLiteSettingsRepository(database));
+    const store = await service.create({ name: 'Protected Market' });
+    const product = await products.create({ barcode: '0099999999999', name: 'Tea' });
+    await prices.record({ storeId: store.id, productId: product.id, priceCents: 499 });
+
+    await expect(service.delete(store.id)).rejects.toBeInstanceOf(StoreDeletionBlockedError);
+    await expect(storeRepository.findById(store.id)).resolves.not.toBeNull();
+  });
+
+  it('deletes an empty store without affecting other stores', async () => {
+    const storeRepository = new SQLiteStoreRepository(database, clock);
+    const settings = new SQLiteSettingsRepository(database);
+    const service = new StoreService(storeRepository, settings);
+    const first = await service.create({ name: 'Temporary Market' });
+    const second = await service.create({ name: 'Keep Market' });
+    await service.select(first.id);
+
+    await service.delete(first.id);
+
+    await expect(storeRepository.findById(first.id)).resolves.toBeNull();
+    await expect(storeRepository.findById(second.id)).resolves.not.toBeNull();
+    await expect(service.getSelected()).resolves.toBeNull();
   });
 });

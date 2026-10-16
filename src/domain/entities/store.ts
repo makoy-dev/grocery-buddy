@@ -7,9 +7,17 @@ export type Store = {
   updatedAt: string;
 };
 
+export type StoreSummary = Store & {
+  productCount: number;
+};
+
 export type CreateStoreInput = {
   name: string;
   isFavorite?: boolean;
+};
+
+export type UpdateStoreInput = {
+  name: string;
 };
 
 export function normalizeStoreName(name: string): string {

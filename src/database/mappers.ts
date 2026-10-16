@@ -1,7 +1,7 @@
 import type { ProductRow, StoreProductRow, StoreRow } from '@/database/models';
 import type { Product } from '@/domain/entities/product';
 import type { StoreProductPrice } from '@/domain/entities/store-product-price';
-import type { Store } from '@/domain/entities/store';
+import type { Store, StoreSummary } from '@/domain/entities/store';
 
 export function mapStoreRow(row: StoreRow): Store {
   return {
@@ -11,6 +11,13 @@ export function mapStoreRow(row: StoreRow): Store {
     isFavorite: row.is_favorite === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapStoreSummaryRow(row: StoreRow & { product_count: number }): StoreSummary {
+  return {
+    ...mapStoreRow(row),
+    productCount: row.product_count,
   };
 }
 

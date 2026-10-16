@@ -74,3 +74,9 @@ export type AppSettingRow = {
   key: string;
   value: string;
 };
+
+export type StoreDeletionDependencyRow = {
+  product_count: number;
+  history_count: number;
+  session_count: number;
+};

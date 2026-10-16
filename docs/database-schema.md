@@ -10,7 +10,7 @@ The application stores all durable data in `grocery-buddy.db` through `expo-sqli
 - Launches and upgrades never drop tables or recreate the database. Later changes must preserve existing rows or explicitly transform them in a new migration.
 - Static migration DDL uses the unbound execution API. Repositories and version writes use prepared, parameterized statements.
 
-Current schema version: **1** (`initial_schema`).
+Current schema version: **2** (`protect_store_history_from_delete`).
 
 ## Tables
 
@@ -31,7 +31,8 @@ All application tables use SQLite `STRICT` mode. Money fields are constrained to
 
 ## Relationships and delete policies
 
-- Deleting a store or product cascades through its current prices and price observations.
+- If a store or product is explicitly deleted after dependent price rows are absent, its derived current-price and observation rows cascade with it.
+- A migration trigger blocks store deletion when current prices, price observations, or shopping sessions exist; this prevents an ordinary store-management action from silently deleting historical data.
 - A store referenced by a shopping session is restricted from deletion, preserving session history.
 - Deleting a shopping session cascades to its items.
 - Deleting a shopping list cascades to its items.
