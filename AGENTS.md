@@ -1,41 +1,64 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+# Grocery Buddy Engineering Guide
 
-## Expo has changed — do not trust your training data
+Grocery Buddy is an Android-first, iOS-compatible Expo application. It is a fully offline grocery price tracker: users select a store, scan a barcode, save a store-specific price, and estimate a shopping total.
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
+## Non-negotiable offline rules
 
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
+- The shipped app must work without an account or internet connection.
+- Persist app data locally with `expo-sqlite`. Do not add a backend, cloud database, authentication, analytics, remote configuration, or runtime network calls.
+- Do not send barcode, product, store, price, shopping-list, or usage data off-device.
+- Treat the SQLite schema and migrations as the source of truth. Use parameterized queries for user-provided values.
+- A feature is not complete until cold-start and offline behavior are validated on a device or emulator.
+
+## Architecture
+
+- `src/app/`: Expo Router route files and route layouts only. Keep screens thin.
+- `src/components/ui/`: shared presentational primitives without feature-specific business rules.
+- `src/features/<feature>/`: feature-owned UI, hooks, validation, state, use cases, and tests.
+- `src/domain/entities/`: business entities with no React Native, Expo, or SQLite dependencies.
+- `src/domain/interfaces/`: repository and service contracts needed by domain/use-case code.
+- `src/database/migrations/`: ordered, forward-only SQLite migrations.
+- `src/database/repositories/`: SQLite implementations of domain repository interfaces.
+- `src/hooks/`, `src/lib/`, `src/types/`, `src/utils/`, and `src/theme/`: cross-cutting code that is genuinely shared.
+
+The initial feature boundaries are `stores`, `products`, `pricing`, `scanner`, `cart`, `sessions`, `budget`, `shopping-lists`, `history`, `comparisons`, `reports`, and `settings`. Add code to a boundary only when that milestone is implemented. Prefer direct, readable use cases and repositories over generic base classes or speculative abstractions.
+
+## Conventions
+
+- TypeScript is strict. Do not use `any` to bypass domain or database types.
+- Import project code through `@/…`; use relative imports only within a tightly coupled local folder.
+- Expo Router owns navigation. Route files coordinate components and use cases but do not contain SQL or pricing calculations.
+- Zustand stores hold transient application/session state. Durable records belong in SQLite.
+- Validate form input with React Hook Form and Zod at the UI boundary, then pass typed values to use cases.
+- Keep price values in integer minor currency units (for example, cents) unless a documented domain decision says otherwise.
+- Keep platform behavior compatible with Android and iOS. Android is the primary manual-validation target.
+- Use NativeWind for routine component styling and shared theme tokens for navigation or imperative APIs.
+- Tests live beside the code they cover in `__tests__` folders or as `*.test.ts(x)` files.
+- Do not present disabled or placeholder UI as a working feature. Label milestone scaffolding plainly.
+
+## Expo dependencies
+
+This project currently uses Expo SDK 58. Before changing an Expo API, confirm the installed `expo` major version and consult its matching versioned documentation. Add packages with `npx expo install` so native versions stay SDK-compatible. Do not hand-edit generated `android/` or `ios/` directories; configure native behavior through app config and config plugins.
 
 ## Commands
 
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
-
 ```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
-npx expo lint               # lint
-npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
+npm install
+npm run start
+npm run android
+npm run lint
+npm run typecheck
+npm test
+npm run doctor
 ```
 
-Run lint and typecheck before declaring any task done.
+## Milestone validation
 
-## Navigation & Routing
+For every milestone:
 
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
-
-## Building with EAS
-
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
-
-## Rules
-
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+1. Run lint, TypeScript, and the relevant unit/component tests.
+2. Run `npm run doctor` after dependency or Expo configuration changes.
+3. Exercise the changed flow on Android; also check iOS when platform-specific code or configuration changes.
+4. Validate once with the device/emulator offline and after a cold start.
+5. For database changes, test both a fresh database and an upgrade from the prior schema version.
+6. Report what was statically verified versus what was actually exercised on a device. Do not call build, lint, or unit tests end-to-end proof.

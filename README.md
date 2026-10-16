@@ -1,56 +1,75 @@
-# Welcome to your Expo app 👋
+# Grocery Buddy
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Grocery Buddy is an Android-first, iOS-compatible grocery shopping price tracker built with Expo and React Native. It is designed to keep stores, products, prices, shopping sessions, and totals entirely on the device.
 
-## Get started
+This repository currently contains the application foundation and five-tab navigation shell. Store management, barcode scanning, price persistence, and cart calculations are not implemented yet.
 
-1. Install dependencies
+## Stack
 
-   ```bash
-   npm install
-   ```
+- Expo SDK 58, React Native, and TypeScript
+- Expo Router
+- `expo-sqlite` for on-device persistence
+- `expo-camera` for future barcode scanning
+- Zustand for transient state
+- NativeWind for styling
+- React Hook Form and Zod for forms and validation
+- Jest and React Native Testing Library
 
-2. Start the app
+## Requirements
 
-   ```bash
-   npx expo start
-   ```
+- Node.js supported by the installed Expo SDK
+- npm
+- Android Studio/emulator or an Android device for primary development
+- macOS with Xcode for the iOS simulator, or a compatible physical-device workflow
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Setup
 
 ```bash
-npm run reset-project
+npm install
+npm run start
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+From the Expo terminal, open Android, iOS, or web as supported by your machine. You can also start a target directly:
 
-### Other setup steps
+```bash
+npm run android
+npm run ios
+npm run web
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+The camera dependency is configured with barcode scanning enabled and Android audio recording disabled. No camera permission is requested by the current shell because scanning is not implemented yet.
 
-## Learn more
+## Quality checks
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run doctor
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## Project layout
 
-## Join the community
+```text
+src/
+  app/                    # Expo Router routes and layouts
+  components/ui/          # Shared UI primitives
+  features/               # Feature-owned modules
+  database/
+    migrations/           # Forward-only SQLite migrations
+    repositories/         # SQLite repository implementations
+  domain/
+    entities/             # Framework-independent business entities
+    interfaces/           # Repository and service contracts
+  hooks/                  # Shared React hooks
+  lib/                    # Shared infrastructure helpers
+  types/                  # Shared TypeScript types
+  utils/                  # Pure cross-feature utilities
+  theme/                  # Design tokens and navigation themes
+```
 
-Join our community of developers creating universal apps.
+The feature boundaries are stores, products, pricing, scanner, cart, sessions, budget, shopping lists, history, comparisons, reports, and settings. Empty feature directories are intentional until their milestones begin.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Offline guarantee
+
+Runtime features must not depend on a backend, authentication provider, analytics service, or network request. Durable data belongs in SQLite. Changes that introduce network-capable SDKs or remote data flows require an explicit architecture decision and conflict with the current product goal.
