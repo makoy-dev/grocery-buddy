@@ -52,6 +52,13 @@ export default function MoreScreen() {
           <Text className="text-2xl text-muted dark:text-muted-dark">›</Text>
         </View>
       </Link>
+      <Link href="/reports" className="rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+        <View className="flex-row items-center">
+          <View className="h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/10 dark:bg-violet-400/15"><SymbolView name={{ ios: 'chart.bar.xaxis', android: 'bar_chart' }} tintColor="#8B5CF6" size={24} /></View>
+          <View className="ml-4 flex-1"><Text className="text-base font-bold text-ink dark:text-ink-dark">Reports & insights</Text><Text className="mt-1 text-sm text-muted dark:text-muted-dark">Understand local grocery spending trends</Text></View>
+          <Text className="text-2xl text-muted dark:text-muted-dark">›</Text>
+        </View>
+      </Link>
       </View>
     </AppScreen>
   );

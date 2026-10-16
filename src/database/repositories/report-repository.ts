@@ -1,0 +1,38 @@
+import type { DatabaseConnection } from '@/database/connection';
+import type { ReportDateRange, ReportsSnapshot } from '@/domain/entities/report';
+import type { ReportRepository } from '@/domain/interfaces/report-repository';
+
+type SummaryRow = { completed_sessions: number; estimated_total_cents: number | null; actual_total_cents: number | null; sessions_with_actual_total: number };
+type PeriodRow = { period: string; estimated_total_cents: number | null; actual_total_cents: number | null };
+type StoreRow = { store_id: number; store_name: string; estimated_total_cents: number | null; actual_total_cents: number | null; session_count: number };
+type FrequencyRow = { product_id: number; product_name: string; quantity: number; session_count: number };
+type ExpensiveRow = { product_id: number; product_name: string; highest_unit_price_cents: number; total_spent_cents: number };
+type PriceChangeRow = { product_id: number; product_name: string; first_price_cents: number; latest_price_cents: number; first_recorded_at: string; latest_recorded_at: string };
+type BudgetRow = { sessions_with_budget: number; budget_cents: number | null; estimated_total_cents: number | null; actual_total_cents: number | null; over_budget_count: number };
+
+export class SQLiteReportRepository implements ReportRepository {
+  constructor(private readonly database: DatabaseConnection) {}
+
+  async getSnapshot(range: ReportDateRange): Promise<ReportsSnapshot> {
+    if (!range.from || !range.to || range.from > range.to) throw new Error('The report date range is invalid.');
+    const [summary, periods, byStore, frequentProducts, expensiveProducts, priceChanges, budget] = await Promise.all([
+      this.database.first<SummaryRow>(`SELECT COUNT(*) AS completed_sessions, COALESCE(SUM(estimated_total_cents), 0) AS estimated_total_cents, COALESCE(SUM(actual_total_cents), 0) AS actual_total_cents, COUNT(actual_total_cents) AS sessions_with_actual_total FROM shopping_sessions WHERE status = 'completed' AND started_at >= ? AND started_at <= ?`, [range.from, range.to]),
+      this.database.all<PeriodRow>(`SELECT strftime('%Y-%m', started_at) AS period, COALESCE(SUM(estimated_total_cents), 0) AS estimated_total_cents, COALESCE(SUM(actual_total_cents), 0) AS actual_total_cents FROM shopping_sessions WHERE status = 'completed' AND started_at >= ? AND started_at <= ? GROUP BY period ORDER BY period`, [range.from, range.to]),
+      this.database.all<StoreRow>(`SELECT stores.id AS store_id, stores.name AS store_name, COALESCE(SUM(shopping_sessions.estimated_total_cents), 0) AS estimated_total_cents, COALESCE(SUM(shopping_sessions.actual_total_cents), 0) AS actual_total_cents, COUNT(shopping_sessions.id) AS session_count FROM shopping_sessions JOIN stores ON stores.id = shopping_sessions.store_id WHERE shopping_sessions.status = 'completed' AND shopping_sessions.started_at >= ? AND shopping_sessions.started_at <= ? GROUP BY stores.id, stores.name ORDER BY estimated_total_cents DESC`, [range.from, range.to]),
+      this.database.all<FrequencyRow>(`SELECT shopping_items.product_id, COALESCE(shopping_items.product_name_snapshot, products.name) AS product_name, SUM(shopping_items.quantity) AS quantity, COUNT(DISTINCT shopping_items.session_id) AS session_count FROM shopping_items JOIN shopping_sessions ON shopping_sessions.id = shopping_items.session_id JOIN products ON products.id = shopping_items.product_id WHERE shopping_sessions.status = 'completed' AND shopping_sessions.started_at >= ? AND shopping_sessions.started_at <= ? GROUP BY shopping_items.product_id, product_name ORDER BY quantity DESC, session_count DESC LIMIT 10`, [range.from, range.to]),
+      this.database.all<ExpensiveRow>(`SELECT shopping_items.product_id, COALESCE(shopping_items.product_name_snapshot, products.name) AS product_name, MAX(shopping_items.unit_price_cents) AS highest_unit_price_cents, SUM(shopping_items.quantity * shopping_items.unit_price_cents) AS total_spent_cents FROM shopping_items JOIN shopping_sessions ON shopping_sessions.id = shopping_items.session_id JOIN products ON products.id = shopping_items.product_id WHERE shopping_sessions.status = 'completed' AND shopping_sessions.started_at >= ? AND shopping_sessions.started_at <= ? GROUP BY shopping_items.product_id, product_name ORDER BY highest_unit_price_cents DESC LIMIT 10`, [range.from, range.to]),
+      this.database.all<PriceChangeRow>(`SELECT p.id AS product_id, p.name AS product_name, (SELECT ph.price_cents FROM price_history ph WHERE ph.product_id = p.id AND ph.recorded_at >= ? AND ph.recorded_at <= ? ORDER BY ph.recorded_at ASC, ph.id ASC LIMIT 1) AS first_price_cents, (SELECT ph.price_cents FROM price_history ph WHERE ph.product_id = p.id AND ph.recorded_at >= ? AND ph.recorded_at <= ? ORDER BY ph.recorded_at DESC, ph.id DESC LIMIT 1) AS latest_price_cents, (SELECT ph.recorded_at FROM price_history ph WHERE ph.product_id = p.id AND ph.recorded_at >= ? AND ph.recorded_at <= ? ORDER BY ph.recorded_at ASC, ph.id ASC LIMIT 1) AS first_recorded_at, (SELECT ph.recorded_at FROM price_history ph WHERE ph.product_id = p.id AND ph.recorded_at >= ? AND ph.recorded_at <= ? ORDER BY ph.recorded_at DESC, ph.id DESC LIMIT 1) AS latest_recorded_at FROM products p WHERE EXISTS (SELECT 1 FROM price_history ph WHERE ph.product_id = p.id AND ph.recorded_at >= ? AND ph.recorded_at <= ?) ORDER BY ABS(latest_price_cents - first_price_cents) DESC LIMIT 10`, [range.from, range.to, range.from, range.to, range.from, range.to, range.from, range.to, range.from, range.to]),
+      this.database.first<BudgetRow>(`SELECT COUNT(*) AS sessions_with_budget, COALESCE(SUM(budget_cents), 0) AS budget_cents, COALESCE(SUM(estimated_total_cents), 0) AS estimated_total_cents, COALESCE(SUM(actual_total_cents), 0) AS actual_total_cents, SUM(CASE WHEN COALESCE(actual_total_cents, estimated_total_cents) > budget_cents THEN 1 ELSE 0 END) AS over_budget_count FROM shopping_sessions WHERE status = 'completed' AND budget_set = 1 AND started_at >= ? AND started_at <= ?`, [range.from, range.to]),
+    ]);
+    return {
+      range,
+      summary: { completedSessions: summary?.completed_sessions ?? 0, estimatedTotalCents: summary?.estimated_total_cents ?? 0, actualTotalCents: summary?.actual_total_cents ?? 0, sessionsWithActualTotal: summary?.sessions_with_actual_total ?? 0 },
+      periods: periods.map((row) => ({ period: row.period, estimatedTotalCents: row.estimated_total_cents ?? 0, actualTotalCents: row.actual_total_cents ?? 0 })),
+      byStore: byStore.map((row) => ({ storeId: row.store_id, storeName: row.store_name, estimatedTotalCents: row.estimated_total_cents ?? 0, actualTotalCents: row.actual_total_cents ?? 0, sessionCount: row.session_count })),
+      frequentProducts: frequentProducts.map((row) => ({ productId: row.product_id, productName: row.product_name, quantity: row.quantity, sessionCount: row.session_count })),
+      expensiveProducts: expensiveProducts.map((row) => ({ productId: row.product_id, productName: row.product_name, highestUnitPriceCents: row.highest_unit_price_cents, totalSpentCents: row.total_spent_cents })),
+      priceChanges: priceChanges.map((row) => ({ productId: row.product_id, productName: row.product_name, firstPriceCents: row.first_price_cents, latestPriceCents: row.latest_price_cents, changeCents: row.latest_price_cents - row.first_price_cents, firstRecordedAt: row.first_recorded_at, latestRecordedAt: row.latest_recorded_at })),
+      budgetUsage: { sessionsWithBudget: budget?.sessions_with_budget ?? 0, budgetCents: budget?.budget_cents ?? 0, estimatedTotalCents: budget?.estimated_total_cents ?? 0, actualTotalCents: budget?.actual_total_cents ?? 0, overBudgetCount: budget?.over_budget_count ?? 0 },
+    };
+  }
+}

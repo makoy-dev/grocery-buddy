@@ -287,6 +287,21 @@ export default function CartScreen() {
                 ))}
               </View>
             )}
+            <View className="mt-5 rounded-2xl border border-border bg-surface p-4 dark:border-border-dark dark:bg-surface-dark">
+              <Text className="font-semibold text-ink dark:text-ink-dark">Actual checkout total</Text>
+              <Text className="mt-1 text-sm text-muted dark:text-muted-dark">
+                Optional — enter the amount from your receipt before completing this session.
+              </Text>
+              <TextInput
+                accessibilityLabel="Actual checkout total in PHP"
+                className="mt-3 rounded-xl border border-border bg-canvas px-4 py-3 text-lg text-ink dark:border-border-dark dark:bg-canvas-dark dark:text-ink-dark"
+                keyboardType="decimal-pad"
+                onChangeText={setActual}
+                placeholder="e.g. 1250.00"
+                placeholderTextColor="#78716c"
+                value={actual}
+              />
+            </View>
             <View className="mt-4 flex-row gap-3">
               <Pressable
                 className="rounded-xl border border-red-200 px-4 py-3 dark:border-red-800"
