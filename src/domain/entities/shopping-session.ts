@@ -5,7 +5,7 @@ export type ShoppingSession = {
   storeId: number;
   storeName: string;
   status: ShoppingSessionStatus;
-  budgetCents: number;
+  budgetCents: number | null;
   estimatedTotalCents: number;
   actualTotalCents: number | null;
   startedAt: string;

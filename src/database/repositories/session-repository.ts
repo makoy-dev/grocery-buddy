@@ -38,6 +38,22 @@ export class SQLiteSessionRepository implements SessionRepository {
     return this.updateStatus(id, 'cancelled', null);
   }
 
+  async setBudget(id: number, budgetCents: number | null): Promise<ShoppingSession> {
+    if (budgetCents !== null && (!Number.isSafeInteger(budgetCents) || budgetCents < 0)) {
+      throw new Error('Budget must be zero or a positive integer in cents.');
+    }
+    return this.database.transaction(async (transaction) => {
+      const result = await transaction.run(
+        `UPDATE shopping_sessions SET budget_cents = ?, budget_set = ? WHERE id = ? AND status = 'active'`,
+        [budgetCents ?? 0, budgetCents === null ? 0 : 1, id],
+      );
+      if (result.changes !== 1) throw new Error('Only an active shopping session can change its budget.');
+      const session = await this.queryById(transaction, id);
+      if (!session) throw new Error('Budget update succeeded but the session could not be read.');
+      return session;
+    });
+  }
+
   private async updateStatus(id: number, status: 'completed' | 'cancelled', actualTotalCents: number | null): Promise<ShoppingSession> {
     return this.database.transaction(async (transaction) => {
       const result = await transaction.run(
@@ -57,5 +73,5 @@ export class SQLiteSessionRepository implements SessionRepository {
 }
 
 function mapSession(row: SessionQueryRow): ShoppingSession {
-  return { id: row.id, storeId: row.store_id, storeName: row.store_name, status: row.status, budgetCents: row.budget_cents, estimatedTotalCents: row.estimated_total_cents, actualTotalCents: row.actual_total_cents, startedAt: row.started_at, completedAt: row.completed_at, itemCount: row.item_count };
+  return { id: row.id, storeId: row.store_id, storeName: row.store_name, status: row.status, budgetCents: row.budget_set === 1 ? row.budget_cents : null, estimatedTotalCents: row.estimated_total_cents, actualTotalCents: row.actual_total_cents, startedAt: row.started_at, completedAt: row.completed_at, itemCount: row.item_count };
 }

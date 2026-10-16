@@ -43,6 +43,7 @@ export type ShoppingSessionRow = {
   store_id: number;
   status: ShoppingSessionStatus;
   budget_cents: number;
+  budget_set?: 0 | 1;
   estimated_total_cents: number;
   actual_total_cents: number | null;
   started_at: string;

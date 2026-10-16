@@ -22,6 +22,7 @@ import { SQLiteSessionRepository } from '@/database/repositories/session-reposit
 import { SessionService } from '@/features/sessions/services/session-service';
 import { SQLiteCartRepository } from '@/database/repositories/cart-repository';
 import { CartService } from '@/features/cart/services/cart-service';
+import { calculateBudgetState } from '@/features/budget/services/budget-calculations';
 
 import { NodeSQLiteConnection } from '@/database/__test-support__/node-sqlite-connection';
 
@@ -80,7 +81,7 @@ describe('SQLite database infrastructure', () => {
     await runMigrations(database, clock);
 
     const versionRows = await database.all<{ version: number }>('SELECT version FROM schema_version ORDER BY version');
-    expect(versionRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
+    expect(versionRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }, { version: 4 }]);
     await expect(stores.findById(store.id)).resolves.toEqual(store);
   });
 
@@ -111,7 +112,7 @@ describe('SQLite database infrastructure', () => {
     ).resolves.toMatchObject({ changes: 1 });
     await expect(database.first<{ version: number }>(
       'SELECT MAX(version) AS version FROM schema_version',
-    )).resolves.toEqual({ version: 3 });
+    )).resolves.toEqual({ version: 4 });
   });
 
   it('enforces foreign-key relationships', async () => {
@@ -363,6 +364,21 @@ describe('SQLite database infrastructure', () => {
     await expect(service.discard(session.id)).resolves.toMatchObject({ status: 'cancelled', storeId: store.id });
     await expect(database.first<{ count: number }>('SELECT COUNT(*) AS count FROM shopping_sessions WHERE id = ?', [session.id])).resolves.toEqual({ count: 1 });
     await expect(service.start(store.id)).resolves.toMatchObject({ status: 'active', storeId: store.id });
+  });
+
+  it('supports no budget, zero budget, boundary warnings, and budget updates', async () => {
+    expect(calculateBudgetState(null, 5000)).toEqual({ remainingCents: null, usagePercent: 0, warning: false, overBudget: false });
+    expect(calculateBudgetState(0, 0)).toMatchObject({ remainingCents: 0, usagePercent: 0, warning: false, overBudget: false });
+    expect(calculateBudgetState(10000, 8000)).toMatchObject({ remainingCents: 2000, warning: true, overBudget: false });
+    expect(calculateBudgetState(10000, 10000)).toMatchObject({ remainingCents: 0, warning: true, overBudget: false });
+    expect(calculateBudgetState(10000, 10001)).toMatchObject({ remainingCents: -1, warning: true, overBudget: true });
+
+    const store = await new SQLiteStoreRepository(database, clock).create({ name: 'Budget Market' });
+    const service = new SessionService(new SQLiteSessionRepository(database, clock));
+    const session = await service.start(store.id);
+    await expect(service.setBudget(session.id, '0')).resolves.toMatchObject({ budgetCents: 0 });
+    await expect(service.setBudget(session.id, '100.00')).resolves.toMatchObject({ budgetCents: 10000 });
+    await expect(service.setBudget(session.id, null)).resolves.toMatchObject({ budgetCents: null });
   });
 
   it('maintains cart snapshots, quantities, integer totals, removal, and store isolation', async () => {

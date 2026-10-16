@@ -1,10 +1,17 @@
 import { Link } from 'expo-router';
 import { SafeAreaView, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
 
 import { useSelectedStore } from '@/features/stores/hooks/use-selected-store';
+import { useSessionService } from '@/features/sessions/hooks/use-session-service';
+import type { ShoppingSession } from '@/domain/entities/shopping-session';
+import { formatPhpCents } from '@/utils/format-money';
 
 export default function HomeScreen() {
   const { selectedStore, isLoading } = useSelectedStore();
+  const sessions = useSessionService();
+  const [session, setSession] = useState<ShoppingSession | null>(null);
+  useEffect(() => { if (selectedStore) void sessions.getActive(selectedStore.id).then(setSession); }, [selectedStore, sessions]);
 
   return (
     <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark">
@@ -22,6 +29,7 @@ export default function HomeScreen() {
             <Text className="mt-2 text-sm text-muted dark:text-muted-dark">
               {selectedStore.productCount} saved {selectedStore.productCount === 1 ? 'product' : 'products'}
             </Text>
+            {session && <View className="mt-5 border-t border-border pt-4"><Text className="text-sm font-semibold text-ink dark:text-ink-dark">Active trip</Text><Text className="mt-1 text-sm text-muted">Estimated total: {formatPhpCents(session.estimatedTotalCents)}</Text><Text className="mt-1 text-sm text-muted">{session.budgetCents === null ? 'No budget set' : `Budget: ${formatPhpCents(session.budgetCents)}`}</Text></View>}
           </View>
         ) : (
           <View className="mt-8 rounded-2xl border border-dashed border-border p-6 dark:border-border-dark">
