@@ -8,6 +8,12 @@
     "scheme": "grocerybuddy",
     "userInterfaceStyle": "automatic",
     "android": {
+      "package": "com.grocerygodz.grocerybuddy",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E8771B",
         "foregroundImage": "./assets/images/grocery-godz-bg.png"
@@ -23,9 +29,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#E8771B",
+          "image": "./assets/images/grocery-godz-bg.png",
+          "imageWidth": 220
         }
       ],
       "expo-sqlite",
@@ -43,6 +49,17 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "6042b129-be00-4349-9545-31a78d071aab"
+      }
+    },
+    "owner": "makoy696"
   }
 }
