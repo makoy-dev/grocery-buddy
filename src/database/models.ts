@@ -15,6 +15,7 @@ export type ProductRow = {
   category: string | null;
   unit: string | null;
   package_size: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };

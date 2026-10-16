@@ -1,5 +1,5 @@
 import type { ProductRow, StoreProductRow, StoreRow } from '@/database/models';
-import type { Product } from '@/domain/entities/product';
+import type { Product, ProductSummary } from '@/domain/entities/product';
 import type { StoreProductPrice } from '@/domain/entities/store-product-price';
 import type { Store, StoreSummary } from '@/domain/entities/store';
 
@@ -30,8 +30,17 @@ export function mapProductRow(row: ProductRow): Product {
     category: row.category,
     unit: row.unit,
     packageSize: row.package_size,
+    archivedAt: row.archived_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapProductSummaryRow(row: ProductRow & { current_price_cents: number | null }): ProductSummary {
+  return {
+    ...mapProductRow(row),
+    currentPriceCents: row.current_price_cents,
+    hasPriceForStore: row.current_price_cents !== null,
   };
 }
 

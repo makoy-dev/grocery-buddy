@@ -10,14 +10,14 @@ The application stores all durable data in `grocery-buddy.db` through `expo-sqli
 - Launches and upgrades never drop tables or recreate the database. Later changes must preserve existing rows or explicitly transform them in a new migration.
 - Static migration DDL uses the unbound execution API. Repositories and version writes use prepared, parameterized statements.
 
-Current schema version: **2** (`protect_store_history_from_delete`).
+Current schema version: **3** (`add_product_archive_and_delete_guard`).
 
 ## Tables
 
 | Table | Purpose | Important constraints |
 | --- | --- | --- |
 | `stores` | Grocery stores | Unique normalized name; favorite is `0` or `1` |
-| `products` | Barcode-identified products | Barcode is unique `TEXT`, preserving leading zeros |
+| `products` | Shared barcode-identified catalog | Barcode is unique `TEXT`, preserving leading zeros; `archived_at` retains old catalog records |
 | `store_products` | Current store-specific product price | Unique store/product pair; non-negative integer cents |
 | `price_history` | Append-only price observations | Non-negative integer cents with recorded timestamp |
 | `shopping_sessions` | Store shopping trips | Status is active/completed/cancelled; money uses integer cents |
@@ -33,6 +33,7 @@ All application tables use SQLite `STRICT` mode. Money fields are constrained to
 
 - If a store or product is explicitly deleted after dependent price rows are absent, its derived current-price and observation rows cascade with it.
 - A migration trigger blocks store deletion when current prices, price observations, or shopping sessions exist; this prevents an ordinary store-management action from silently deleting historical data.
+- A product migration trigger blocks deletion when current prices, price observations, cart items, or shopping-list items exist. Product management archives records instead, preserving references and history.
 - A store referenced by a shopping session is restricted from deletion, preserving session history.
 - Deleting a shopping session cascades to its items.
 - Deleting a shopping list cascades to its items.
@@ -47,6 +48,7 @@ Deletion is never part of initialization or migration startup.
 - Price history is indexed by store, product, and newest recording time.
 - Session lookup is indexed by store and newest start time.
 - Foreign-key lookup indexes cover product references that are not already the leading columns of a unique index.
+- Archived products are indexed with their name for catalog administration.
 
 ## Repository boundary
 

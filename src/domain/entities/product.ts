@@ -6,6 +6,7 @@ export type Product = {
   category: string | null;
   unit: string | null;
   packageSize: string | null;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -17,4 +18,11 @@ export type CreateProductInput = {
   category?: string | null;
   unit?: string | null;
   packageSize?: string | null;
+};
+
+export type UpdateProductInput = CreateProductInput;
+
+export type ProductSummary = Product & {
+  currentPriceCents: number | null;
+  hasPriceForStore: boolean;
 };

@@ -16,6 +16,7 @@ import { SQLiteSettingsRepository } from '@/database/repositories/settings-repos
 import { SQLiteStoreRepository } from '@/database/repositories/store-repository';
 import { StoreDeletionBlockedError } from '@/domain/errors/store-errors';
 import { StoreService } from '@/features/stores/services/store-service';
+import { ProductService } from '@/features/products/services/product-service';
 
 import { NodeSQLiteConnection } from '@/database/__test-support__/node-sqlite-connection';
 
@@ -73,8 +74,8 @@ describe('SQLite database infrastructure', () => {
 
     await runMigrations(database, clock);
 
-    const versionRows = await database.all<{ version: number }>('SELECT version FROM schema_version');
-    expect(versionRows).toEqual([{ version: 1 }, { version: 2 }]);
+    const versionRows = await database.all<{ version: number }>('SELECT version FROM schema_version ORDER BY version');
+    expect(versionRows).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
     await expect(stores.findById(store.id)).resolves.toEqual(store);
   });
 
@@ -105,7 +106,7 @@ describe('SQLite database infrastructure', () => {
     ).resolves.toMatchObject({ changes: 1 });
     await expect(database.first<{ version: number }>(
       'SELECT MAX(version) AS version FROM schema_version',
-    )).resolves.toEqual({ version: 2 });
+    )).resolves.toEqual({ version: 3 });
   });
 
   it('enforces foreign-key relationships', async () => {
@@ -256,5 +257,43 @@ describe('SQLite database infrastructure', () => {
     await expect(storeRepository.findById(first.id)).resolves.toBeNull();
     await expect(storeRepository.findById(second.id)).resolves.not.toBeNull();
     await expect(service.getSelected()).resolves.toBeNull();
+  });
+
+  it('supports product search, archive, restore, and store-scoped missing prices', async () => {
+    const stores = new SQLiteStoreRepository(database, clock);
+    const products = new SQLiteProductRepository(database, clock);
+    const prices = new SQLitePricingRepository(database, clock);
+    const firstStore = await stores.create({ name: 'First Market' });
+    const secondStore = await stores.create({ name: 'Second Market' });
+    const rice = await products.create({ barcode: '00001', name: 'Jasmine Rice', brand: 'Local Farms' });
+    const tea = await products.create({ barcode: '00002', name: 'Breakfast Tea', brand: 'Local Farms' });
+    await prices.record({ storeId: firstStore.id, productId: rice.id, priceCents: 1299 });
+    const service = new ProductService(products);
+
+    await expect(service.list({ search: '00001' })).resolves.toHaveLength(1);
+    await expect(service.list({ search: 'local farms' })).resolves.toHaveLength(2);
+    await expect(service.list({ storeId: firstStore.id, missingPriceOnly: true })).resolves.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: tea.id, hasPriceForStore: false })]),
+    );
+    await expect(service.list({ storeId: secondStore.id, missingPriceOnly: true })).resolves.toHaveLength(2);
+
+    await service.archive(rice.id);
+    await expect(service.list()).resolves.toHaveLength(1);
+    await expect(service.list({ includeArchived: true })).resolves.toHaveLength(2);
+    await service.unarchive(rice.id);
+    await expect(service.list()).resolves.toHaveLength(2);
+  });
+
+  it('keeps referenced products safe from deletion while preserving price history on archive', async () => {
+    const stores = new SQLiteStoreRepository(database, clock);
+    const products = new SQLiteProductRepository(database, clock);
+    const prices = new SQLitePricingRepository(database, clock);
+    const store = await stores.create({ name: 'Safe Market' });
+    const product = await products.create({ barcode: '00003', name: 'Protected Product' });
+    await prices.record({ storeId: store.id, productId: product.id, priceCents: 500 });
+
+    await expect(database.run('DELETE FROM products WHERE id = ?', [product.id])).rejects.toThrow(/Cannot delete a product/);
+    await products.archive(product.id);
+    await expect(database.first<{ count: number }>('SELECT COUNT(*) AS count FROM price_history WHERE product_id = ?', [product.id])).resolves.toEqual({ count: 1 });
   });
 });

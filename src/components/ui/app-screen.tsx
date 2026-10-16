@@ -5,9 +5,10 @@ type AppScreenProps = {
   title: string;
   description: string;
   note: string;
+  children?: React.ReactNode;
 };
 
-export function AppScreen({ title, description, note }: AppScreenProps) {
+export function AppScreen({ title, description, note, children }: AppScreenProps) {
   return (
     <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark">
       <View className="flex-1 px-6 py-8">
@@ -18,6 +19,7 @@ export function AppScreen({ title, description, note }: AppScreenProps) {
         <View className="mt-8 rounded-2xl border border-border bg-surface p-5 dark:border-border-dark dark:bg-surface-dark">
           <Text className="text-sm leading-5 text-muted dark:text-muted-dark">{note}</Text>
         </View>
+        {children}
       </View>
     </SafeAreaView>
   );
