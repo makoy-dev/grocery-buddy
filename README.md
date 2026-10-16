@@ -73,3 +73,5 @@ The feature boundaries are stores, products, pricing, scanner, cart, sessions, b
 ## Offline guarantee
 
 Runtime features must not depend on a backend, authentication provider, analytics service, or network request. Durable data belongs in SQLite. Changes that introduce network-capable SDKs or remote data flows require an explicit architecture decision and conflict with the current product goal.
+
+The versioned SQLite schema, constraints, indexes, and delete policies are documented in [docs/database-schema.md](docs/database-schema.md).

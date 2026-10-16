@@ -50,6 +50,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
+    "test:database": "jest src/database/__tests__ --runInBand",
     "test:watch": "jest --watch",
     "doctor": "npx --yes expo-doctor@latest"
   },
