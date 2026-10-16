@@ -1,36 +1,22 @@
 import { Link } from 'expo-router';
-import { SafeAreaView, Text, View } from 'react-native';
-
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, SafeAreaView, Text, TextInput, View } from 'react-native';
+import type { ShoppingSession } from '@/domain/entities/shopping-session';
 import { useSelectedStore } from '@/features/stores/hooks/use-selected-store';
+import { useSessionService } from '@/features/sessions/hooks/use-session-service';
+import { formatPhpCents } from '@/utils/format-money';
 
 export default function CartScreen() {
-  const { selectedStore, isLoading } = useSelectedStore();
-
-  if (isLoading) {
-    return <SafeAreaView className="flex-1 bg-canvas px-6 py-8 dark:bg-canvas-dark"><Text className="text-sm text-muted dark:text-muted-dark">Loading selected store…</Text></SafeAreaView>;
-  }
-
-  return (
-    <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark">
-      <View className="flex-1 px-6 py-8">
-        <Text className="text-3xl font-bold text-ink dark:text-ink-dark">Cart</Text>
-        {selectedStore ? (
-          <>
-            <Text className="mt-3 text-base leading-6 text-muted dark:text-muted-dark">
-              Your {selectedStore.name} shopping estimate will appear here once cart tracking is implemented.
-            </Text>
-            <View className="mt-8 rounded-2xl border border-border bg-surface p-5 dark:border-border-dark dark:bg-surface-dark">
-              <Text className="text-sm leading-5 text-muted dark:text-muted-dark">Cart calculations are not implemented yet.</Text>
-            </View>
-          </>
-        ) : (
-          <View className="mt-8 rounded-2xl border border-dashed border-border p-6 dark:border-border-dark">
-            <Text className="text-lg font-semibold text-ink dark:text-ink-dark">Select a store first</Text>
-            <Text className="mt-2 text-sm leading-5 text-muted dark:text-muted-dark">Cart prices must belong to a selected store.</Text>
-            <Link className="mt-5 self-start rounded-xl bg-primary px-4 py-3 font-semibold text-white dark:bg-primary-dark dark:text-stone-950" href="/(tabs)/stores">Choose store</Link>
-          </View>
-        )}
-      </View>
-    </SafeAreaView>
-  );
+  const { selectedStore, isLoading } = useSelectedStore(); const sessions = useSessionService();
+  const [session, setSession] = useState<ShoppingSession | null>(null); const [history, setHistory] = useState<ShoppingSession[]>([]); const [actual, setActual] = useState(''); const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => { if (!selectedStore) return; try { setSession(await sessions.getActive(selectedStore.id)); setHistory(await sessions.history(selectedStore.id)); setError(null); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : 'Unable to load shopping session.'); } }, [selectedStore, sessions]);
+  // Session state is synchronized with the durable SQLite record when the selected store changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load(); }, [load]);
+  if (isLoading) return <SafeAreaView className="flex-1 bg-canvas px-6 py-8"><Text className="text-sm text-muted">Loading selected store…</Text></SafeAreaView>;
+  if (!selectedStore) return <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark"><View className="flex-1 px-6 py-8"><Text className="text-3xl font-bold text-ink">Cart</Text><View className="mt-8 rounded-2xl border border-dashed border-border p-6"><Text className="text-lg font-semibold text-ink">Select a store first</Text><Text className="mt-2 text-sm text-muted">Shopping sessions belong to exactly one store.</Text><Link className="mt-5 self-start rounded-xl bg-primary px-4 py-3 font-semibold text-white" href="/(tabs)/stores">Choose store</Link></View></View></SafeAreaView>;
+  const start = async () => { setBusy(true); try { setSession(await sessions.start(selectedStore.id)); await load(); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : 'Unable to start session.'); } finally { setBusy(false); } };
+  const complete = () => Alert.alert('Complete shopping session?', 'The estimated total will be preserved. You can optionally enter the actual checkout total.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Complete', onPress: () => void (async () => { setBusy(true); try { await sessions.complete(session!.id, actual.trim() ? actual : null); setActual(''); await load(); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : 'Unable to complete session.'); } finally { setBusy(false); } })() }]);
+  const discard = () => Alert.alert('Discard shopping session?', 'The session and its items remain in history as cancelled.', [{ text: 'Keep', style: 'cancel' }, { text: 'Discard', style: 'destructive', onPress: () => void (async () => { setBusy(true); try { await sessions.discard(session!.id); await load(); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : 'Unable to discard session.'); } finally { setBusy(false); } })() }]);
+  return <SafeAreaView className="flex-1 bg-canvas dark:bg-canvas-dark"><View className="flex-1 px-6 py-8"><Text className="text-3xl font-bold text-ink">Cart</Text><Text className="mt-1 text-sm text-muted">Sessions stay tied to the store where they started.</Text>{error && <Text className="mt-3 text-sm text-red-700">{error}</Text>}{!session ? <View className="mt-8 rounded-2xl border border-dashed border-border p-6"><Text className="text-lg font-semibold text-ink">No active session at {selectedStore.name}</Text><Text className="mt-2 text-sm text-muted">Start a trip before adding scanned products.</Text><Pressable className="mt-5 self-start rounded-xl bg-primary px-4 py-3" disabled={busy} onPress={() => void start()}><Text className="font-semibold text-white">Start shopping session</Text></Pressable></View> : <View className="mt-8 rounded-2xl border border-primary bg-surface p-5"><Text className="text-xs font-semibold uppercase tracking-wide text-primary">{session.status === 'active' ? 'Active session' : session.status === 'completed' ? 'Completed session' : 'Cancelled session'}</Text><Text className="mt-2 text-xl font-bold text-ink">{session.storeName}</Text><Text className="mt-1 text-sm text-muted">Started {new Date(session.startedAt).toLocaleDateString()} · {session.itemCount} {session.itemCount === 1 ? 'item' : 'items'}</Text><Text className="mt-5 text-sm text-muted">Estimated total</Text><Text className="mt-1 text-2xl font-bold text-ink">{formatPhpCents(session.estimatedTotalCents)}</Text>{session.actualTotalCents !== null && <Text className="mt-2 text-sm text-muted">Checkout total: {formatPhpCents(session.actualTotalCents)}</Text>}{session.status === 'active' && <><TextInput accessibilityLabel="Actual checkout total" className="mt-5 rounded-xl border border-border bg-surface px-4 py-3 text-base text-ink" keyboardType="decimal-pad" onChangeText={setActual} placeholder="Actual total (optional)" placeholderTextColor="#78716c" value={actual} /><View className="mt-4 flex-row gap-3"><Pressable className="rounded-xl bg-primary px-4 py-3" disabled={busy} onPress={complete}><Text className="font-semibold text-white">Complete</Text></Pressable><Pressable className="rounded-xl border border-red-200 px-4 py-3" disabled={busy} onPress={discard}><Text className="font-semibold text-red-700">Discard</Text></Pressable></View></>}</View>}{history.filter((item) => item.id !== session?.id).length > 0 && <View className="mt-8"><Text className="text-lg font-semibold text-ink">Session history</Text>{history.filter((item) => item.id !== session?.id).map((item) => <View key={item.id} className="mt-3 rounded-xl border border-border bg-surface p-4"><Text className="font-semibold text-ink">{item.status === 'completed' ? 'Completed' : 'Cancelled'} · {new Date(item.startedAt).toLocaleDateString()}</Text><Text className="mt-1 text-sm text-muted">{item.itemCount} {item.itemCount === 1 ? 'item' : 'items'} · Estimated {formatPhpCents(item.estimatedTotalCents)}</Text></View>)}</View>}</View></SafeAreaView>;
 }

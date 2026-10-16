@@ -47,6 +47,8 @@ export type ShoppingSessionRow = {
   actual_total_cents: number | null;
   started_at: string;
   completed_at: string | null;
+  store_name?: string;
+  item_count?: number;
 };
 
 export type ShoppingItemRow = {

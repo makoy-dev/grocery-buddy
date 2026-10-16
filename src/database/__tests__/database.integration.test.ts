@@ -18,6 +18,8 @@ import { StoreDeletionBlockedError } from '@/domain/errors/store-errors';
 import { StoreService } from '@/features/stores/services/store-service';
 import { ProductService } from '@/features/products/services/product-service';
 import { PricingService, parsePhpToCents } from '@/features/pricing/services/pricing-service';
+import { SQLiteSessionRepository } from '@/database/repositories/session-repository';
+import { SessionService } from '@/features/sessions/services/session-service';
 
 import { NodeSQLiteConnection } from '@/database/__test-support__/node-sqlite-connection';
 
@@ -331,5 +333,33 @@ describe('SQLite database infrastructure', () => {
     expect(() => parsePhpToCents('-1')).toThrow(/PHP amount/);
     expect(() => parsePhpToCents('12.999')).toThrow(/two decimal/);
     expect(() => parsePhpToCents(Number.NaN)).toThrow(/PHP amount/);
+  });
+
+  it('keeps sessions separate by store, resumes active sessions, and preserves completed history', async () => {
+    const stores = new SQLiteStoreRepository(database, clock);
+    const first = await stores.create({ name: 'Session One' });
+    const second = await stores.create({ name: 'Session Two' });
+    const service = new SessionService(new SQLiteSessionRepository(database, clock));
+    const firstSession = await service.start(first.id);
+    expect(await service.start(first.id)).toEqual(firstSession);
+    const secondSession = await service.start(second.id);
+    expect(secondSession.id).not.toBe(firstSession.id);
+    await expect(service.getActive(first.id)).resolves.toMatchObject({ id: firstSession.id, storeId: first.id, status: 'active' });
+
+    await database.run('UPDATE shopping_sessions SET estimated_total_cents = 15000 WHERE id = ?', [firstSession.id]);
+    const completed = await service.complete(firstSession.id, '148.50');
+    expect(completed).toMatchObject({ status: 'completed', estimatedTotalCents: 15000, actualTotalCents: 14850 });
+    await expect(service.getActive(first.id)).resolves.toBeNull();
+    await expect(service.history(first.id)).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ id: firstSession.id, status: 'completed', storeId: first.id })]));
+    await expect(service.getActive(second.id)).resolves.toMatchObject({ id: secondSession.id, storeId: second.id });
+  });
+
+  it('discards an active session without deleting its historical row', async () => {
+    const store = await new SQLiteStoreRepository(database, clock).create({ name: 'Discard Market' });
+    const service = new SessionService(new SQLiteSessionRepository(database, clock));
+    const session = await service.start(store.id);
+    await expect(service.discard(session.id)).resolves.toMatchObject({ status: 'cancelled', storeId: store.id });
+    await expect(database.first<{ count: number }>('SELECT COUNT(*) AS count FROM shopping_sessions WHERE id = ?', [session.id])).resolves.toEqual({ count: 1 });
+    await expect(service.start(store.id)).resolves.toMatchObject({ status: 'active', storeId: store.id });
   });
 });
