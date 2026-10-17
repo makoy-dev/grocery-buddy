@@ -4,16 +4,18 @@
     "slug": "grocery-buddy",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/grocery-godz-bg.png",
+    "icon": "./assets/images/grocery-godz-icon.png",
     "scheme": "grocerybuddy",
     "userInterfaceStyle": "automatic",
     "android": {
       "package": "com.grocerygodz.grocerybuddy",
       "versionCode": 1,
-      "permissions": ["CAMERA"],
+      "permissions": [
+        "CAMERA"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E8771B",
-        "foregroundImage": "./assets/images/grocery-godz-bg.png"
+        "foregroundImage": "./assets/images/grocery-godz-icon.png"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -41,7 +43,16 @@
         }
       ],
       "expo-font",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

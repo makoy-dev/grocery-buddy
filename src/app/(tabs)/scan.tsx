@@ -50,6 +50,7 @@ export default function ScanScreen() {
   const [cameraStarted, setCameraStarted] = useState(false);
   const [torch, setTorch] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [scanStatus, setScanStatus] = useState<string | null>(null);
   const [lookupResult, setLookupResult] = useState<BarcodeLookup | null>(null);
   const [manualBarcode, setManualBarcode] = useState("");
   const [cartQuantity, setCartQuantity] = useState(1);
@@ -123,6 +124,7 @@ export default function ScanScreen() {
     setForm(null);
     setError(null);
     setCameraError(null);
+    setScanStatus(null);
     setCartQuantity(1);
     setCameraStarted(true);
     setScanning(true);
@@ -131,6 +133,7 @@ export default function ScanScreen() {
     setLookupResult(null);
     setError(null);
     setCameraError(null);
+    setScanStatus("Starting camera…");
     setCameraStarted(true);
     setScanning(true);
   };
@@ -209,9 +212,11 @@ export default function ScanScreen() {
                 barcodeScannerSettings={{
                   barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e"],
                 }}
-                onBarcodeScanned={(event: BarcodeScanningResult) =>
-                  void handleLookup(event.data, event.type)
-                }
+                onCameraReady={() => setScanStatus("Camera ready. Align an EAN or UPC barcode inside the frame.")}
+                onBarcodeScanned={(event: BarcodeScanningResult) => {
+                  setScanStatus(`Barcode detected (${event.type}). Looking it up…`);
+                  void handleLookup(event.data, event.type);
+                }}
                 onMountError={(event) => {
                   setCameraError(event.message);
                   setScanning(false);
@@ -324,6 +329,11 @@ export default function ScanScreen() {
               Check Grocery Godz camera access in Android Settings, then try again.
             </Text>
           </View>
+        )}
+        {scanStatus && !cameraError && (
+          <Text className="mt-3 text-xs text-muted dark:text-muted-dark">
+            {scanStatus}
+          </Text>
         )}
         {lookupResult && (
           <View className="mt-5 rounded-2xl border border-primary bg-surface p-5 dark:bg-surface-dark">
