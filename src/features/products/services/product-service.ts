@@ -23,6 +23,8 @@ export class ProductService {
 
   private async assertBarcodeAvailable(barcode: string, excludingId?: number) {
     const existing = await this.products.findByBarcode(barcode.trim());
-    if (existing && existing.id !== excludingId) throw new DuplicateProductBarcodeError();
+    if (existing && existing.id !== excludingId) {
+      throw new DuplicateProductBarcodeError(barcode.trim());
+    }
   }
 }

@@ -1,8 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
+import * as React from "react";
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from "expo-camera";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { z } from "zod";
 import type { CreateProductInput } from "@/domain/entities/product";
+import { normalizeBarcode } from "@/features/scanner/services/barcode-lookup-service";
 
 const schema = z.object({
   barcode: z
@@ -46,7 +49,7 @@ export function ProductForm({
   onCancel,
   onSubmit,
 }: Props) {
-  const { control, formState, handleSubmit } = useForm<ProductFormValues>({
+  const { control, formState, handleSubmit, setValue } = useForm<ProductFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       barcode: initialValues.barcode ?? "",
@@ -57,6 +60,55 @@ export function ProductForm({
       packageSize: initialValues.packageSize ?? "",
     },
   });
+  const [scannerVisible, setScannerVisible] = React.useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [scannerError, setScannerError] = React.useState<string | null>(null);
+  const scanLock = React.useRef(false);
+  const openScanner = async () => {
+    setScannerError(null);
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        setScannerError("Camera access is needed to scan a barcode. You can still enter it manually.");
+        return;
+      }
+    }
+    scanLock.current = false;
+    setScannerVisible(true);
+  };
+  const handleBarcode = (result: BarcodeScanningResult) => {
+    if (scanLock.current) return;
+    const barcode = normalizeBarcode(result.data, result.type);
+    if (!barcode) {
+      setScannerError("That barcode format is not supported.");
+      return;
+    }
+    scanLock.current = true;
+    setValue("barcode", barcode, { shouldDirty: true, shouldValidate: true });
+    setScannerVisible(false);
+  };
+  if (scannerVisible) {
+    return (
+      <View className="flex-1 bg-black">
+        <CameraView
+          style={{ flex: 1, width: "100%", height: "100%" }}
+          facing="back"
+          barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e"] }}
+          onBarcodeScanned={handleBarcode}
+          onMountError={(mountError) => {
+            setScannerError(`Unable to start the camera: ${mountError.message}`);
+            setScannerVisible(false);
+          }}
+        />
+        <View className="absolute inset-x-0 bottom-0 p-6">
+          <Text className="mb-4 text-center text-white">Align the barcode inside the frame</Text>
+          <Pressable className="rounded-xl bg-white px-4 py-3" onPress={() => setScannerVisible(false)}>
+            <Text className="text-center font-semibold text-black">Cancel</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
   return (
     <ScrollView keyboardShouldPersistTaps="handled">
       <Text className="text-2xl font-bold text-ink dark:text-ink-dark">
@@ -95,6 +147,16 @@ export function ProductForm({
           )}
         </View>
       ))}
+      <Pressable
+        accessibilityLabel="Scan product barcode"
+        className="mt-4 self-start rounded-xl border border-primary px-4 py-3"
+        onPress={() => void openScanner()}
+      >
+        <Text className="font-semibold text-primary">Scan barcode with camera</Text>
+      </Pressable>
+      {scannerError && (
+        <Text className="mt-2 text-sm text-red-700 dark:text-red-300">{scannerError}</Text>
+      )}
       {serverError && (
         <Text className="mt-3 text-sm text-red-700 dark:text-red-300">{serverError}</Text>
       )}
