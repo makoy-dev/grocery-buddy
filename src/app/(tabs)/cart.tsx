@@ -1,6 +1,7 @@
 import { Link, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
+  Modal,
   Pressable,
   ScrollView,
   Text,
@@ -14,6 +15,7 @@ import { useCartRepository } from "@/features/cart/hooks/use-cart-repository";
 import { useSelectedStore } from "@/features/stores/hooks/use-selected-store";
 import { useSessionService } from "@/features/sessions/hooks/use-session-service";
 import { usePricingService } from "@/features/pricing/hooks/use-pricing-service";
+import { useProductService } from "@/features/products/hooks/use-product-service";
 import { parsePhpToCents } from "@/features/pricing/services/pricing-service";
 import { formatPhpCents } from "@/utils/format-money";
 import { BudgetPanel } from "@/features/budget/components/budget-panel";
@@ -24,12 +26,18 @@ export default function CartScreen() {
   const sessions = useSessionService();
   const cart = useCartRepository();
   const pricing = usePricingService();
+  const products = useProductService();
   const [session, setSession] = useState<ShoppingSession | null>(null);
   const [history, setHistory] = useState<ShoppingSession[]>([]);
   const [items, setItems] = useState<CartItem[]>([]);
   const [actual, setActual] = useState("");
   const [editing, setEditing] = useState<CartItem | null>(null);
   const [editPrice, setEditPrice] = useState("");
+  const [temporaryVisible, setTemporaryVisible] = useState(false);
+  const [temporaryName, setTemporaryName] = useState("");
+  const [temporaryUnit, setTemporaryUnit] = useState("kg");
+  const [temporaryPrice, setTemporaryPrice] = useState("");
+  const [temporaryQuantity, setTemporaryQuantity] = useState("1");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const { showDialog, dialogElement } = useAppDialog();
@@ -156,6 +164,30 @@ export default function CartScreen() {
     }
   };
   const clear = () => showDialog({ title: "Clear cart?", message: "All items will be removed from this active session.", confirmLabel: "Clear", cancelLabel: "Cancel", destructive: true, onConfirm: () => void cart.clear(selectedStore.id).then(refreshItems).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to clear cart.")) });
+  const addTemporaryItem = async () => {
+    try {
+      const name = temporaryName.trim();
+      if (!name) throw new Error("Enter a temporary item name.");
+      const quantity = Number(temporaryQuantity);
+      if (!Number.isSafeInteger(quantity) || quantity < 1) throw new Error("Quantity must be a positive whole number.");
+      const cents = parsePhpToCents(temporaryPrice);
+      const product = await products.create({
+        barcode: `TEMP-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        name,
+        unit: temporaryUnit.trim() || "unit",
+        category: "Temporary item",
+      });
+      await cart.addItem(selectedStore.id, product.id, cents, quantity);
+      setTemporaryVisible(false);
+      setTemporaryName("");
+      setTemporaryPrice("");
+      setTemporaryQuantity("1");
+      await load();
+      showDialog({ title: "Added to cart", message: `${quantity} × ${name} was added as a temporary item.` });
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Unable to add temporary item.");
+    }
+  };
   const complete = () => showDialog({ title: "Complete shopping session?", message: "The estimated total will be preserved.", confirmLabel: "Complete", cancelLabel: "Cancel", onConfirm: () => void (async () => { setBusy(true); try { await sessions.complete(session!.id, actual.trim() ? actual : null); setActual(""); await load(); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : "Unable to complete session."); } finally { setBusy(false); } })() });
   const discard = () => showDialog({ title: "Discard shopping session?", message: "The session and its items remain in history as cancelled.", confirmLabel: "Discard", cancelLabel: "Keep", destructive: true, onConfirm: () => void (async () => { setBusy(true); try { await sessions.discard(session!.id); await load(); } catch (cause: unknown) { setError(cause instanceof Error ? cause.message : "Unable to discard session."); } finally { setBusy(false); } })() });
   return (
@@ -212,6 +244,12 @@ export default function CartScreen() {
               onSave={saveBudget}
               onRemove={removeBudget}
             />
+            <Pressable
+              className="mt-4 self-start rounded-xl border border-primary px-4 py-3"
+              onPress={() => setTemporaryVisible(true)}
+            >
+              <Text className="font-semibold text-primary">Add temporary item</Text>
+            </Pressable>
             {items.length === 0 ? (
               <View className="mt-6 rounded-2xl border border-dashed border-border p-6 dark:border-border-dark">
                 <Text className="text-lg font-semibold text-ink dark:text-ink-dark">
@@ -335,6 +373,22 @@ export default function CartScreen() {
           </Text>
         )}
       </View>
+      <Modal visible={temporaryVisible} animationType="slide" onRequestClose={() => setTemporaryVisible(false)}>
+        <SafeAreaView className="flex-1 bg-canvas px-6 py-8 dark:bg-canvas-dark">
+          <Text className="text-2xl font-bold text-ink dark:text-ink-dark">Add temporary item</Text>
+          <Text className="mt-2 text-sm text-muted dark:text-muted-dark">
+            Use this for weighed or unpackaged goods without a barcode, such as chicken, vegetables, or fruit.
+          </Text>
+          <TextInput accessibilityLabel="Temporary item name" className="mt-5 rounded-xl border border-border bg-surface px-4 py-3 text-base text-ink dark:border-border-dark dark:bg-surface-dark dark:text-ink-dark" onChangeText={setTemporaryName} placeholder="Item name" placeholderTextColor="#78716c" value={temporaryName} />
+          <TextInput accessibilityLabel="Unit" className="mt-3 rounded-xl border border-border bg-surface px-4 py-3 text-base text-ink dark:border-border-dark dark:bg-surface-dark dark:text-ink-dark" onChangeText={setTemporaryUnit} placeholder="Unit (e.g. kg)" placeholderTextColor="#78716c" value={temporaryUnit} />
+          <TextInput accessibilityLabel="Price per unit" className="mt-3 rounded-xl border border-border bg-surface px-4 py-3 text-base text-ink dark:border-border-dark dark:bg-surface-dark dark:text-ink-dark" keyboardType="decimal-pad" onChangeText={setTemporaryPrice} placeholder="Price per unit in PHP" placeholderTextColor="#78716c" value={temporaryPrice} />
+          <TextInput accessibilityLabel="Temporary item quantity" className="mt-3 rounded-xl border border-border bg-surface px-4 py-3 text-base text-ink dark:border-border-dark dark:bg-surface-dark dark:text-ink-dark" keyboardType="number-pad" onChangeText={setTemporaryQuantity} placeholder="Quantity" placeholderTextColor="#78716c" value={temporaryQuantity} />
+          <View className="mt-5 flex-row gap-3">
+            <Pressable className="rounded-xl bg-primary px-4 py-3" onPress={() => void addTemporaryItem()}><Text className="font-semibold text-white">Add to cart</Text></Pressable>
+            <Pressable className="rounded-xl border border-border px-4 py-3 dark:border-border-dark" onPress={() => setTemporaryVisible(false)}><Text className="font-semibold text-ink dark:text-ink-dark">Cancel</Text></Pressable>
+          </View>
+        </SafeAreaView>
+      </Modal>
       <View
         className="absolute inset-0"
         pointerEvents={editing ? "auto" : "none"}
