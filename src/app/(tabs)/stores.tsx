@@ -126,6 +126,15 @@ export default function StoresScreen() {
     }
   };
 
+  const selectOnly = async (store: StoreSummary) => {
+    try {
+      await selectStore(store.id);
+      setError(null);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Unable to select this store.");
+    }
+  };
+
   const confirmDelete = (store: StoreSummary) => {
     showDialog({ title: `Delete ${store.name}?`, message: "A store with saved prices or shopping history cannot be deleted. Empty stores can be removed permanently.", confirmLabel: "Delete", cancelLabel: "Cancel", destructive: true, onConfirm: () => { void service.delete(store.id).then(async () => { if (selectedStore?.id === store.id) clearSelectedStore(); await reload(); }).catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Unable to delete this store.")); } });
   };
@@ -189,6 +198,7 @@ export default function StoresScreen() {
               isSelected={selectedStore?.id === item.id}
               onEdit={() => openEdit(item)}
               onFavorite={() => void toggleFavorite(item)}
+              onSelect={() => void selectOnly(item)}
               onPress={() => void openStore(item)}
               store={item}
             />
